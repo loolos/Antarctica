@@ -29,6 +29,8 @@ class WorldState:
                     "age": p.age,
                     "state": p.state,
                     "max_energy": p.max_energy,
+                    "behavior_state": p.behavior_state,
+                    "is_juvenile": p.is_juvenile(),
                 }
                 for p in self.penguins
             ],
@@ -41,6 +43,8 @@ class WorldState:
                     "age": s.age,
                     "state": s.state,
                     "max_energy": s.max_energy,
+                    "behavior_state": s.behavior_state,
+                    "is_juvenile": s.is_juvenile(),
                 }
                 for s in self.seals
             ],

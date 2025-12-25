@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useCallback } from 'react';
 import { WorldState, AnimationState } from '../types';
-import { drawPenguin, drawSeal } from '../sprites';
+import { drawPenguin, drawSeal, drawFish } from '../sprites';
 
 interface SimulationCanvasProps {
   worldState: WorldState | null;
@@ -18,6 +18,7 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
   const animationsRef = useRef<Map<string, AnimationState>>(new Map());
   const worldStateRef = useRef<WorldState | null>(null);
   const lastPositionsRef = useRef<Map<string, { x: number; y: number }>>(new Map());
+  const animationStartTimeRef = useRef<number>(performance.now());
 
   // Update worldState reference
   useEffect(() => {
@@ -139,15 +140,34 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
       ctx.fillRect(0, 0, width, height);
     }
 
-    // Draw fish
+    // Draw fish with animated sprites
     state.fish.forEach((fish) => {
       const anim = anims.get(fish.id);
       if (!anim) return;
 
-      ctx.fillStyle = '#4a9eff';
-      ctx.beginPath();
-      ctx.arc(anim.x, anim.y, 3, 0, Math.PI * 2);
-      ctx.fill();
+      // Determine facing direction based on movement
+      const lastPos = lastPositionsRef.current.get(fish.id);
+      let facing: 'left' | 'right' = 'right';
+      if (lastPos) {
+        const dx = anim.x - lastPos.x;
+        if (Math.abs(dx) > 0.1) {
+          facing = dx > 0 ? 'right' : 'left';
+        }
+      }
+      lastPositionsRef.current.set(fish.id, { x: anim.x, y: anim.y });
+      
+      // Calculate animation time
+      const currentTime = performance.now();
+      const animationTime = ((currentTime - animationStartTimeRef.current) * 0.001) % (Math.PI * 2);
+      
+      drawFish(ctx, {
+        x: anim.x,
+        y: anim.y,
+        energy: fish.energy,
+        maxEnergy: fish.max_energy,
+        facing,
+        animationTime,
+      });
     });
 
     // Draw penguins with pixel art sprites
@@ -168,13 +188,37 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
       // Update last position
       lastPositionsRef.current.set(penguin.id, { x: anim.x, y: anim.y });
       
+      // Calculate animation time based on actual time (for smooth animation)
+      const currentTime = performance.now();
+      const animationTime = ((currentTime - animationStartTimeRef.current) * 0.001) % (Math.PI * 2);
+      
+      // Determine if penguin is actually on land based on position and environment
+      // Check if position is on any ice floe
+      let isActuallyOnLand = false;
+      if (state.environment.ice_floes) {
+        for (const floe of state.environment.ice_floes) {
+          const dx = anim.x - floe.x;
+          const dy = anim.y - floe.y;
+          const distance = Math.sqrt(dx * dx + dy * dy);
+          if (distance <= floe.radius) {
+            isActuallyOnLand = true;
+            break;
+          }
+        }
+      }
+      // Use actual position check, fallback to state field if available
+      const actualState = isActuallyOnLand ? 'land' : (penguin.state || 'sea');
+      
       drawPenguin(ctx, {
         x: anim.x,
         y: anim.y,
-        state: penguin.state || 'land',
+        state: actualState,
         energy: penguin.energy,
         maxEnergy: penguin.max_energy,
         facing,
+        behaviorState: penguin.behavior_state || 'idle',
+        animationTime,
+        isJuvenile: penguin.is_juvenile || false,
       });
     });
 
@@ -196,6 +240,10 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
       // Update last position
       lastPositionsRef.current.set(seal.id, { x: anim.x, y: anim.y });
       
+      // Calculate animation time based on actual time (for smooth animation)
+      const currentTime = performance.now();
+      const animationTime = ((currentTime - animationStartTimeRef.current) * 0.001) % (Math.PI * 2);
+      
       drawSeal(ctx, {
         x: anim.x,
         y: anim.y,
@@ -203,6 +251,9 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
         energy: seal.energy,
         maxEnergy: seal.max_energy,
         facing,
+        behaviorState: seal.behavior_state || 'idle',
+        animationTime,
+        isJuvenile: seal.is_juvenile || false,
       });
     });
 

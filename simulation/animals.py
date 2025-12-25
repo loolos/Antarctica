@@ -28,6 +28,7 @@ class Animal:
     flee_edge_direction: float = 0.0  # Direction along edge when fleeing (in radians)
     target_id: str = ""  # ID of the target being tracked (for distance tracking)
     hunting_cooldown: int = 0  # Cooldown after successful predation (prevents immediate re-hunting)
+    flee_cooldown: int = 0  # Cooldown for fleeing state (continues fleeing for 3 seconds after predator is out of sight)
     
     def move(self, dx: float, dy: float, world_width: int, world_height: int):
         """Move the animal"""
@@ -75,6 +76,11 @@ class Animal:
         """Calculate distance to another animal"""
         return math.sqrt((self.x - other.x) ** 2 + (self.y - other.y) ** 2)
     
+    def is_juvenile(self) -> bool:
+        """Check if animal is juvenile (not yet adult)"""
+        # Default: juvenile for first 100 ticks (20 seconds at 5 ticks/sec)
+        return self.age < 100
+    
     def tick(self):
         """Update each tick"""
         self.age += 1
@@ -93,6 +99,18 @@ class Penguin(Animal):
         self.max_age = 800
         self.land_speed = 2.0  # Agile on land
         self.water_speed = 4.0  # Fast in water
+        self.maturity_age = 100  # Age at which penguin becomes adult (100 ticks = 20 seconds)
+    
+    def is_juvenile(self) -> bool:
+        """Check if penguin is juvenile"""
+        return self.age < self.maturity_age
+    
+    def get_speed(self, is_water: bool) -> float:
+        """Get current speed based on age and location"""
+        base_speed = self.water_speed if is_water else self.land_speed
+        if self.is_juvenile():
+            return base_speed * 0.5  # Juveniles move at 50% speed
+        return base_speed
     
     def can_breed(self) -> bool:
         """检查是否可以繁殖"""
@@ -118,6 +136,8 @@ class Penguin(Animal):
             self.breeding_cooldown -= 1
         if self.hunting_cooldown > 0:
             self.hunting_cooldown -= 1
+        if self.flee_cooldown > 0:
+            self.flee_cooldown -= 1
         
         # State transitions handled by engine based on location
         
@@ -134,6 +154,18 @@ class Seal(Animal):
         self.max_age = 1200
         self.land_speed = 0.5   # Clumsy on land
         self.water_speed = 5.5  # Very fast in water
+        self.maturity_age = 150  # Age at which seal becomes adult (150 ticks = 30 seconds)
+    
+    def is_juvenile(self) -> bool:
+        """Check if seal is juvenile"""
+        return self.age < self.maturity_age
+    
+    def get_speed(self, is_water: bool) -> float:
+        """Get current speed based on age and location"""
+        base_speed = self.water_speed if is_water else self.land_speed
+        if self.is_juvenile():
+            return base_speed * 0.5  # Juveniles move at 50% speed
+        return base_speed
     
     def can_breed(self) -> bool:
         """Check if can breed"""

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 
 interface ControlPanelProps {
   connected: boolean;
@@ -15,6 +15,42 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
   onReset,
   onStep,
 }) => {
+  const [speed, setSpeed] = useState(1.0);
+  const [speedDisplay, setSpeedDisplay] = useState('1.0x');
+
+  // Load current speed from backend on mount
+  useEffect(() => {
+    if (connected) {
+      fetch('http://localhost:8000/speed')
+        .then(res => res.json())
+        .then(data => {
+          setSpeed(data.speed);
+          setSpeedDisplay(`${data.speed.toFixed(1)}x`);
+        })
+        .catch(err => console.error('Failed to get speed:', err));
+    }
+  }, [connected]);
+
+  const handleSpeedChange = async (newSpeed: number) => {
+    setSpeed(newSpeed);
+    setSpeedDisplay(`${newSpeed.toFixed(1)}x`);
+    
+    try {
+      const response = await fetch('http://localhost:8000/speed', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ speed: newSpeed }),
+      });
+      if (!response.ok) {
+        console.error('Failed to set speed');
+      }
+    } catch (error) {
+      console.error('Failed to set speed:', error);
+    }
+  };
+
   const handleStart = async () => {
     try {
       const response = await fetch('http://localhost:8000/start', {
@@ -66,6 +102,37 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
       <div style={{ marginBottom: '10px', color: connected ? '#00ff00' : '#ff0000' }}>
         Connection Status: {connected ? 'Connected' : 'Disconnected'}
       </div>
+      
+      {/* Speed Control */}
+      <div style={{ marginBottom: '20px' }}>
+        <label style={{ display: 'block', marginBottom: '8px', color: '#ffffff' }}>
+          Simulation Speed: {speedDisplay}
+        </label>
+        <input
+          type="range"
+          min="0.1"
+          max="10"
+          step="0.1"
+          value={speed}
+          onChange={(e) => handleSpeedChange(parseFloat(e.target.value))}
+          disabled={!connected}
+          style={{
+            width: '100%',
+            height: '8px',
+            borderRadius: '4px',
+            background: connected ? '#4a9eff' : '#666',
+            outline: 'none',
+            opacity: connected ? 1 : 0.5,
+            cursor: connected ? 'pointer' : 'not-allowed',
+          }}
+        />
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '4px', fontSize: '12px', color: '#aaa' }}>
+          <span>0.1x (Slow)</span>
+          <span>1.0x (Normal)</span>
+          <span>10x (Fast)</span>
+        </div>
+      </div>
+
       <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
         <button
           onClick={handleStart}

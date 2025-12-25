@@ -19,36 +19,72 @@ class SimulationEngine:
     
     def _initialize_world(self):
         """Initialize the world"""
-        # Create initial penguins (on land)
+        # Create initial penguins with random positions and ages
         for i in range(10):
+            # Random position anywhere on the map
+            x = random.uniform(0, self.world.environment.width)
+            y = random.uniform(0, self.world.environment.height)
+            
+            # Check if position is on land, if not, try to find land position
+            if not self.world.environment.is_land(x, y):
+                # Try to find a land position (ice floe)
+                for attempt in range(20):
+                    if self.world.environment.ice_floes:
+                        floe = random.choice(self.world.environment.ice_floes)
+                        angle = random.uniform(0, 2 * math.pi)
+                        distance = random.uniform(0, floe['radius'] * 0.8)
+                        x = floe['x'] + math.cos(angle) * distance
+                        y = floe['y'] + math.sin(angle) * distance
+                        if self.world.environment.is_land(x, y):
+                            break
+            
             penguin = Penguin(
                 id=f"penguin_{i}",
-                x=random.uniform(0, self.world.environment.width * 0.3),
-                y=random.uniform(0, self.world.environment.height),
+                x=x,
+                y=y,
                 energy=random.uniform(50, 100),
-                state="land"
+                state="land" if self.world.environment.is_land(x, y) else "sea"
             )
+            # Random age: 0 to 200 ticks (mix of juveniles and adults)
+            penguin.age = random.randint(0, 200)
             # Initialize position tracking for boundary detection
             penguin.last_x = penguin.x
             penguin.last_y = penguin.y
-            # Initialize hunting cooldown
+            # Initialize cooldowns
             penguin.hunting_cooldown = 0
+            penguin.flee_cooldown = 0
             self.world.penguins.append(penguin)
         
-        # Create initial seals (in the sea)
+        # Create initial seals with random positions and ages
         for i in range(5):
+            # Random position anywhere on the map
+            x = random.uniform(0, self.world.environment.width)
+            y = random.uniform(0, self.world.environment.height)
+            
+            # Check if position is in sea, if not, try to find sea position
+            if self.world.environment.is_land(x, y):
+                # Try to find a sea position
+                for attempt in range(20):
+                    x = random.uniform(0, self.world.environment.width)
+                    y = random.uniform(0, self.world.environment.height)
+                    if not self.world.environment.is_land(x, y):
+                        break
+            
             seal = Seal(
                 id=f"seal_{i}",
-                x=random.uniform(self.world.environment.width * 0.5, self.world.environment.width),
-                y=random.uniform(0, self.world.environment.height),
+                x=x,
+                y=y,
                 energy=random.uniform(80, 150),
-                state="sea"
+                state="sea" if not self.world.environment.is_land(x, y) else "land"
             )
+            # Random age: 0 to 300 ticks (mix of juveniles and adults)
+            seal.age = random.randint(0, 300)
             # Initialize position tracking for boundary detection
             seal.last_x = seal.x
             seal.last_y = seal.y
-            # Initialize hunting cooldown
+            # Initialize cooldowns
             seal.hunting_cooldown = 0
+            seal.flee_cooldown = 0
             self.world.seals.append(seal)
         
         # Create initial fish (in the sea, not on ice floes)
@@ -140,10 +176,18 @@ class SimulationEngine:
         # Update animal state based on actual location
         if is_on_land:
             animal.state = "land"
-            speed = animal.land_speed
         else:
             animal.state = "sea"
-            speed = animal.water_speed
+        
+        # Determine speed based on location and age
+        if isinstance(animal, (Penguin, Seal)):
+            speed = animal.get_speed(not is_on_land)  # True for water, False for land
+        else:
+            # For fish and other animals, use original logic
+            if is_on_land:
+                speed = animal.land_speed
+            else:
+                speed = animal.water_speed
             
         # 2. AI Decision Making
         dx, dy = 0, 0
@@ -297,11 +341,26 @@ class SimulationEngine:
             if nearest_predator:
                 # Flee! Change to fleeing state (最高优先级: 逃跑 > 锁定 > 分散 > 捕食)
                 animal.behavior_state = "fleeing"
+                # Set flee cooldown to 15 ticks (3 seconds at 5 ticks/sec)
+                animal.flee_cooldown = 15
                 
                 # Calculate base fleeing direction (away from predator)
                 base_dx = animal.x - nearest_predator.x
                 base_dy = animal.y - nearest_predator.y
                 base_flee_angle = math.atan2(base_dy, base_dx) if (base_dx != 0 or base_dy != 0) else random.uniform(0, 2 * math.pi)
+                
+                # Add random variation to fleeing direction (±45 degrees = ±π/4)
+                angle_variation = random.uniform(-math.pi / 4, math.pi / 4)
+                flee_angle = base_flee_angle + angle_variation
+                
+                # Calculate fleeing direction vector with variation
+                flee_dx = math.cos(flee_angle)
+                flee_dy = math.sin(flee_angle)
+                
+                # Constrain direction to avoid hitting boundaries
+                flee_dx, flee_dy = self._constrain_direction_near_edge(animal, flee_dx, flee_dy)
+                # Recalculate angle after constraint
+                flee_angle = math.atan2(flee_dy, flee_dx)
                 
                 # Check for ice floes in the fleeing direction (前方不远处)
                 # Look for ice floes within 200 units in the fleeing direction
@@ -317,7 +376,7 @@ class SimulationEngine:
                     # Check if floe is in front (within 60 degrees of fleeing direction)
                     if floe_distance > 0 and floe_distance < 200:  # Within 200 units
                         floe_angle = math.atan2(floe_dy, floe_dx)
-                        angle_diff = abs((floe_angle - base_flee_angle + math.pi) % (2 * math.pi) - math.pi)
+                        angle_diff = abs((floe_angle - flee_angle + math.pi) % (2 * math.pi) - math.pi)
                         
                         # If floe is in front (within 60 degrees) and closer than previous
                         if angle_diff < math.pi / 3 and floe_distance < min_floe_distance:
@@ -328,14 +387,14 @@ class SimulationEngine:
                 if ice_floe_found:
                     dx = ice_floe_found['x'] - animal.x
                     dy = ice_floe_found['y'] - animal.y
+                    # Constrain direction towards floe to avoid boundaries
+                    dx, dy = self._constrain_direction_near_edge(animal, dx, dy)
                     animal.flee_edge_direction = math.atan2(dy, dx)
                     # Set timer to continue towards floe
                     animal.hunt_direction_ticks = random.randint(15, 30)
                 else:
-                    # No ice floe found, use base fleeing direction
-                    dx = base_dx
-                    dy = base_dy
-                    animal.flee_edge_direction = base_flee_angle
+                    # No ice floe found, use varied fleeing direction
+                    animal.flee_edge_direction = flee_angle
                     animal.hunt_direction_ticks = 0
                 
                 target = nearest_predator # Just to mark as "busy" so we don't hunt while fleeing
@@ -371,16 +430,23 @@ class SimulationEngine:
                         animal.hunt_direction_ticks = random.randint(15, 30)
                     else:
                         # No ice floe found, continue fleeing or exit fleeing state
-                        # No longer see predator, can resume searching if low energy
-                        energy_percent = animal.energy / animal.max_energy
-                        if energy_percent < 0.6:
-                            animal.behavior_state = "searching"  # 返回搜寻状态
-                            # Initialize new searching direction
-                            animal.hunt_direction_angle = random.uniform(0, 2 * math.pi)
-                            animal.hunt_direction_ticks = random.randint(15, 40)
+                        # Only exit fleeing state if cooldown is 0 (no predator seen for 3 seconds)
+                        if animal.flee_cooldown == 0:
+                            # No longer see predator and cooldown expired, can resume normal behavior
+                            energy_percent = animal.energy / animal.max_energy
+                            if energy_percent < 0.6:
+                                animal.behavior_state = "searching"  # 返回搜寻状态
+                                # Initialize new searching direction
+                                animal.hunt_direction_angle = random.uniform(0, 2 * math.pi)
+                                animal.hunt_direction_ticks = random.randint(15, 40)
+                            else:
+                                animal.behavior_state = "idle"
+                                animal.hunt_direction_ticks = 0
                         else:
-                            animal.behavior_state = "idle"
-                            animal.hunt_direction_ticks = 0
+                            # Still in flee cooldown, continue fleeing in current direction
+                            # Continue in the fleeing direction
+                            dx = math.cos(animal.flee_edge_direction) * 30
+                            dy = math.sin(animal.flee_edge_direction) * 30
         
         # 3. Searching Behavior (搜寻状态) - when energy < 60%
         # Animals move in a direction for 3-8 seconds (15-40 ticks at 5 ticks/sec), then change direction
