@@ -1,89 +1,88 @@
-# 启动前后端服务
+# Starting Backend and Frontend Services
 
-## 快速启动
+## Quick Start
 
-### Windows 用户（最简单）
+### Windows Users (Easiest)
 
-1. **启动后端**：
-   - 双击运行 `scripts\start_backend.bat`
-   - 等待看到 "Uvicorn running on http://0.0.0.0:8000"
+1. **Start Backend**:
+   - Double-click `scripts\start_backend.bat`
+   - Wait to see "Uvicorn running on http://0.0.0.0:8000"
 
-2. **启动前端**（打开新窗口）：
-   - 双击运行 `scripts\start_frontend.bat`
-   - 等待看到 "Compiled successfully!"
+2. **Start Frontend** (Open a new window):
+   - Double-click `scripts\start_frontend.bat`
+   - Wait to see "Compiled successfully!"
 
-3. **访问应用**：
-   - 浏览器自动打开，或手动访问 `http://localhost:3000`
+3. **Access Application**:
+   - Browser will open automatically, or manually visit `http://localhost:3000`
 
-### Linux/Mac 用户
+### Linux/Mac Users
 
-1. **启动后端**：
+1. **Start Backend**:
    ```bash
    chmod +x scripts/start_backend.sh
    ./scripts/start_backend.sh
    ```
 
-2. **启动前端**（新终端）：
+2. **Start Frontend** (New terminal):
    ```bash
    chmod +x scripts/start_frontend.sh
    ./scripts/start_frontend.sh
    ```
 
-3. **访问应用**：
-   - 浏览器访问 `http://localhost:3000`
+3. **Access Application**:
+   - Browser visit `http://localhost:3000`
 
-## 手动启动
+## Manual Start
 
-### 后端
+### Backend
 
 ```bash
 cd backend
-# 首次运行需要创建虚拟环境
+# First run needs to create virtual environment
 py -m venv venv
 venv\Scripts\activate  # Windows
-# 或 source venv/bin/activate  # Linux/Mac
+# or source venv/bin/activate  # Linux/Mac
 
-# 安装依赖（首次运行）
+# Install dependencies (first run)
 pip install -r requirements.txt
 
-# 启动服务
+# Start service
 python main.py
 ```
 
-后端将在 `http://localhost:8000` 启动
-- API 文档：`http://localhost:8000/docs`
+Backend will start at `http://localhost:8000`
+- API Documentation: `http://localhost:8000/docs`
 
-### 前端
+### Frontend
 
 ```bash
 cd frontend
 
-# 安装依赖（首次运行）
+# Install dependencies (first run)
 npm install
 
-# 启动开发服务器
+# Start development server
 npm start
 ```
 
-前端将在 `http://localhost:3000` 启动
+Frontend will start at `http://localhost:3000`
 
-## 验证服务运行
+## Verify Service Running
 
-### 检查后端
-- 访问 `http://localhost:8000/state` 应该返回 JSON 数据
-- 访问 `http://localhost:8000/docs` 查看 API 文档
+### Check Backend
+- Visit `http://localhost:8000/state` should return JSON data
+- Visit `http://localhost:8000/docs` to view API documentation
 
-### 检查前端
-- 访问 `http://localhost:3000` 应该看到可视化界面
-- 控制台应该显示 WebSocket 连接成功
+### Check Frontend
+- Visit `http://localhost:3000` should see visualization interface
+- Console should show WebSocket connection successful
 
-## 停止服务
+## Stop Services
 
-- 在运行服务的终端窗口按 `Ctrl+C`
+- Press `Ctrl+C` in the terminal window running the service
 
-## 故障排除
+## Troubleshooting
 
-如果遇到问题，请查看：
-- `docs/RUN_GUIDE.md` - 详细运行指南
-- `docs/TROUBLESHOOTING.md` - 故障排除指南
-
+If you encounter problems, please check:
+- `docs/RUN_GUIDE.md` - Detailed run guide
+- `docs/TROUBLESHOOTING.md` - Troubleshooting guide

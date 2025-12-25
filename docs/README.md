@@ -1,83 +1,82 @@
 # Documentation Index
 
-欢迎查阅项目文档！本文档索引帮助您快速找到所需信息。
+Welcome to the project documentation! This index helps you quickly find the information you need.
 
-## 📚 文档目录
+## 📚 Documentation Directory
 
-### 快速开始
-- **[QUICK_START.md](QUICK_START.md)** - 快速启动指南，最简单的运行方式
-  - Windows 用户双击脚本即可启动
-  - 包含手动运行步骤
+### Quick Start
+- **[QUICK_START.md](QUICK_START.md)** - Quick start guide, the easiest way to run
+  - Windows users can double-click scripts to start
+  - Includes manual run steps
 
-### 运行指南
-- **[RUN_GUIDE.md](RUN_GUIDE.md)** - 详细的运行指南和故障排除
-  - 启动脚本使用方法
-  - 手动运行步骤
-  - 常见问题解决方案
-  - API 测试方法
+### Run Guide
+- **[RUN_GUIDE.md](RUN_GUIDE.md)** - Detailed run guide and troubleshooting
+  - How to use startup scripts
+  - Manual run steps
+  - Common issue solutions
+  - API testing methods
 
-### 架构设计
-- **[ARCHITECTURE.md](ARCHITECTURE.md)** - 项目架构设计文档
-  - 三层架构设计
-  - 数据流图
-  - 模块职责说明
-  - 技术选型说明
+### Architecture Design
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** - Project architecture design document
+  - Three-layer architecture design
+  - Data flow diagrams
+  - Module responsibility descriptions
+  - Technology selection descriptions
 
-### 测试文档
-- **[TESTING.md](TESTING.md)** - 测试系统文档
-  - 测试类型说明
-  - 测试运行方法
-  - 测试覆盖率详情
-  - 编写新测试指南
+### Testing Documentation
+- **[TESTING.md](TESTING.md)** - Testing system documentation
+  - Test type descriptions
+  - Test run methods
+  - Test coverage details
+  - Guide for writing new tests
 
-### 故障排除
-- **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** - 故障排除指南
-  - 常见错误及解决方案
-  - 调试技巧
-  - 性能优化建议
+### Troubleshooting
+- **[TROUBLESHOOTING.md](TROUBLESHOOTING.md)** - Troubleshooting guide
+  - Common errors and solutions
+  - Debugging tips
+  - Performance optimization suggestions
 
-### 其他文档
-- **[TRANSLATION_COMPLETE.md](TRANSLATION_COMPLETE.md)** - 翻译完成记录
-- **[TRANSLATION_SUMMARY.md](TRANSLATION_SUMMARY.md)** - 翻译摘要
-- **[START_TEST_RESULTS.md](START_TEST_RESULTS.md)** - 启动测试结果
-- **[TEST_RESULTS.md](TEST_RESULTS.md)** - 测试结果记录
+### Other Documents
+- **[TRANSLATION_COMPLETE.md](TRANSLATION_COMPLETE.md)** - Translation completion record
+- **[TRANSLATION_SUMMARY.md](TRANSLATION_SUMMARY.md)** - Translation summary
+- **[START_TEST_RESULTS.md](START_TEST_RESULTS.md)** - Startup test results
+- **[TEST_RESULTS.md](TEST_RESULTS.md)** - Test results record
 
-## 🚀 快速导航
+## 🚀 Quick Navigation
 
-### 我是新用户
-1. 先看 [QUICK_START.md](QUICK_START.md) 快速启动项目
-2. 遇到问题查看 [RUN_GUIDE.md](RUN_GUIDE.md) 的故障排除部分
-3. 想了解架构查看 [ARCHITECTURE.md](ARCHITECTURE.md)
+### I'm a New User
+1. First read [QUICK_START.md](QUICK_START.md) to quickly start the project
+2. If you encounter problems, check the troubleshooting section in [RUN_GUIDE.md](RUN_GUIDE.md)
+3. To understand the architecture, read [ARCHITECTURE.md](ARCHITECTURE.md)
 
-### 我要运行测试
-1. 查看 [TESTING.md](TESTING.md) 了解测试系统
-2. 运行 `scripts/run_tests.bat` (Windows) 或 `./scripts/run_tests.sh` (Linux/Mac)
+### I Want to Run Tests
+1. Read [TESTING.md](TESTING.md) to understand the testing system
+2. Run `scripts/run_tests.bat` (Windows) or `./scripts/run_tests.sh` (Linux/Mac)
 
-### 我要开发新功能
-1. 阅读 [ARCHITECTURE.md](ARCHITECTURE.md) 了解架构设计
-2. 查看 [TESTING.md](TESTING.md) 学习如何编写测试
-3. 参考现有代码结构
+### I Want to Develop New Features
+1. Read [ARCHITECTURE.md](ARCHITECTURE.md) to understand the architecture design
+2. Read [TESTING.md](TESTING.md) to learn how to write tests
+3. Refer to existing code structure
 
-## 📁 项目结构
+## 📁 Project Structure
 
 ```
 Antarctica/
-├── docs/          # 📚 所有文档（当前目录）
-├── scripts/       # 🔧 启动和工具脚本
-├── tools/         # 🛠️ 开发工具
-├── tests/         # 🧪 测试文件
-├── simulation/    # 🎮 模拟核心
-├── backend/       # 🔌 后端服务
-└── frontend/      # 🎨 前端界面
+├── docs/          # 📚 All documentation (current directory)
+├── scripts/       # 🔧 Startup and utility scripts
+├── tools/         # 🛠️ Development tools
+├── tests/         # 🧪 Test files
+├── simulation/    # 🎮 Simulation core
+├── backend/       # 🔌 Backend service
+└── frontend/      # 🎨 Frontend interface
 ```
 
-## 🔗 相关链接
+## 🔗 Related Links
 
-- 主 README: [../README.md](../README.md)
-- 脚本目录: [../scripts/](../scripts/)
-- 测试目录: [../tests/](../tests/)
+- Main README: [../README.md](../README.md)
+- Scripts directory: [../scripts/](../scripts/)
+- Tests directory: [../tests/](../tests/)
 
 ---
 
-**提示**: 所有文档都使用 Markdown 格式，可以在 GitHub、VS Code 或其他 Markdown 查看器中查看。
-
+**Tip**: All documents use Markdown format and can be viewed in GitHub, VS Code, or other Markdown viewers.

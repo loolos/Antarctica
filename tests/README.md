@@ -1,29 +1,29 @@
-# 测试系统文档
+# Testing System Documentation
 
-## 测试结构
+## Test Structure
 
 ```
 tests/
-├── test_animals.py      # 动物类单元测试
-├── test_environment.py  # 环境类单元测试
-├── test_engine.py       # 模拟引擎测试
-├── test_integration.py  # 集成测试
-└── run_tests.py        # 测试运行器
+├── test_animals.py      # Animal class unit tests
+├── test_environment.py  # Environment class unit tests
+├── test_engine.py       # Simulation engine tests
+├── test_integration.py  # Integration tests
+└── run_tests.py        # Test runner
 ```
 
-## 运行测试
+## Running Tests
 
-### 方法1: 使用测试运行器
+### Method 1: Using Test Runner
 ```bash
 python tests/run_tests.py
 ```
 
-### 方法2: 使用unittest
+### Method 2: Using unittest
 ```bash
 python -m unittest discover tests
 ```
 
-### 方法3: 运行单个测试文件
+### Method 3: Running Individual Test Files
 ```bash
 python -m unittest tests.test_animals
 python -m unittest tests.test_environment
@@ -31,40 +31,40 @@ python -m unittest tests.test_engine
 python -m unittest tests.test_integration
 ```
 
-## 测试覆盖
+## Test Coverage
 
-### 1. 动物类测试 (test_animals.py)
-- ✅ 企鹅创建和基本属性
-- ✅ 动物移动和边界检查
-- ✅ 能量消耗和恢复
-- ✅ 繁殖机制
-- ✅ 死亡判定
-- ✅ 距离计算
+### 1. Animal Class Tests (test_animals.py)
+- ✅ Penguin creation and basic attributes
+- ✅ Animal movement and boundary checks
+- ✅ Energy consumption and recovery
+- ✅ Breeding mechanism
+- ✅ Death determination
+- ✅ Distance calculation
 
-### 2. 环境类测试 (test_environment.py)
-- ✅ 环境初始化
-- ✅ 陆地/海洋检测
-- ✅ 冰厚度计算
-- ✅ 环境更新（季节变化）
+### 2. Environment Class Tests (test_environment.py)
+- ✅ Environment initialization
+- ✅ Land/sea detection
+- ✅ Ice thickness calculation
+- ✅ Environment update (seasonal changes)
 
-### 3. 模拟引擎测试 (test_engine.py)
-- ✅ 引擎初始化
-- ✅ Tick和Step功能
-- ✅ 状态序列化
-- ✅ 捕食机制
-- ✅ 繁殖机制
-- ✅ 环境更新
-- ✅ 死亡动物移除
+### 3. Simulation Engine Tests (test_engine.py)
+- ✅ Engine initialization
+- ✅ Tick and Step functionality
+- ✅ State serialization
+- ✅ Predation mechanism
+- ✅ Breeding mechanism
+- ✅ Environment update
+- ✅ Dead animal removal
 
-### 4. 集成测试 (test_integration.py)
-- ✅ 完整模拟周期
-- ✅ 状态一致性
-- ✅ JSON序列化
-- ✅ 长时间运行稳定性
+### 4. Integration Tests (test_integration.py)
+- ✅ Complete simulation cycle
+- ✅ State consistency
+- ✅ JSON serialization
+- ✅ Long-running stability
 
-## 测试结果示例
+## Test Result Example
 
-运行测试后，你应该看到类似以下的输出：
+After running tests, you should see output similar to:
 
 ```
 test_animal_creation ... ok
@@ -79,25 +79,24 @@ Ran 25 tests in 0.123s
 OK
 ```
 
-## 添加新测试
+## Adding New Tests
 
-1. 在对应的测试文件中添加新的测试方法
-2. 测试方法名必须以`test_`开头
-3. 使用`self.assert*`方法进行断言
-4. 运行测试验证新功能
+1. Add new test methods in the corresponding test file
+2. Test method names must start with `test_`
+3. Use `self.assert*` methods for assertions
+4. Run tests to verify new functionality
 
-示例：
+Example:
 ```python
 def test_new_feature(self):
-    """测试新功能"""
-    # 准备
+    """Test new feature"""
+    # Arrange
     engine = SimulationEngine()
     
-    # 执行
+    # Act
     engine.step(10)
     
-    # 验证
+    # Assert
     state = engine.get_state()
     self.assertEqual(state.tick, 10)
 ```
-

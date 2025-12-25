@@ -1,47 +1,47 @@
-# 项目文件整理说明
+# Project File Organization
 
-本文档说明项目的文件组织结构整理情况。
+This document describes the project file organization structure.
 
-## 📁 新的目录结构
+## 📁 New Directory Structure
 
-项目已按照功能分类整理，新的目录结构如下：
+The project has been organized by functionality. The new directory structure is as follows:
 
 ```
 Antarctica/
-├── docs/                    # 📚 文档目录
-│   ├── README.md            # 文档索引
-│   ├── QUICK_START.md       # 快速启动指南
-│   ├── RUN_GUIDE.md         # 运行指南
-│   ├── ARCHITECTURE.md      # 架构设计文档
-│   ├── TESTING.md           # 测试文档
-│   ├── TROUBLESHOOTING.md   # 故障排除
-│   └── ...                  # 其他文档
+├── docs/                    # 📚 Documentation directory
+│   ├── README.md            # Documentation index
+│   ├── QUICK_START.md       # Quick start guide
+│   ├── RUN_GUIDE.md         # Run guide
+│   ├── ARCHITECTURE.md      # Architecture design document
+│   ├── TESTING.md           # Testing documentation
+│   ├── TROUBLESHOOTING.md   # Troubleshooting
+│   └── ...                  # Other documents
 │
-├── scripts/                 # 🔧 脚本目录
-│   ├── start_backend.bat/sh # 启动后端
-│   ├── start_frontend.bat/sh # 启动前端
-│   ├── run_tests.bat/sh     # 运行测试
-│   └── ...                  # 其他脚本
+├── scripts/                 # 🔧 Scripts directory
+│   ├── start_backend.bat/sh # Start backend
+│   ├── start_frontend.bat/sh # Start frontend
+│   ├── run_tests.bat/sh     # Run tests
+│   └── ...                  # Other scripts
 │
-├── tools/                   # 🛠️ 工具目录
+├── tools/                   # 🛠️ Tools directory
 │   ├── find_chinese_in_bats.*
 │   ├── fix_deprecation.*
-│   └── ...                  # 开发工具脚本
+│   └── ...                  # Development tool scripts
 │
-├── tests/                   # 🧪 测试目录
-│   ├── test_*.py            # 所有测试文件
-│   ├── run_tests.py         # 测试运行器
-│   └── README.md            # 测试说明
+├── tests/                   # 🧪 Tests directory
+│   ├── test_*.py            # All test files
+│   ├── run_tests.py         # Test runner
+│   └── README.md            # Test documentation
 │
-├── simulation/              # 🎮 模拟核心
-├── backend/                 # 🔌 后端服务
-├── frontend/                # 🎨 前端界面
-└── README.md                # 主文档
+├── simulation/              # 🎮 Simulation core
+├── backend/                 # 🔌 Backend service
+├── frontend/                # 🎨 Frontend interface
+└── README.md                # Main documentation
 ```
 
-## 🔄 文件移动记录
+## 🔄 File Movement Record
 
-### 文档文件 → `docs/`
+### Documentation Files → `docs/`
 - `QUICK_START.md`
 - `RUN_GUIDE.md`
 - `ARCHITECTURE.md`
@@ -52,7 +52,7 @@ Antarctica/
 - `START_TEST_RESULTS.md`
 - `TEST_RESULTS.md`
 
-### 脚本文件 → `scripts/`
+### Script Files → `scripts/`
 - `start_backend.bat` / `start_backend.sh`
 - `start_frontend.bat` / `start_frontend.sh`
 - `start_frontend_debug.bat`
@@ -62,41 +62,41 @@ Antarctica/
 - `test_server_start.bat`
 - `fix_port.bat`
 
-### 工具文件 → `tools/`
+### Tool Files → `tools/`
 - `find_chinese_in_bats.js` / `find_chinese_in_bats.py`
 - `find_deprecated.js`
 - `fix_deprecation.js` / `fix_deprecation.py`
 
-### 测试文件 → `tests/`
+### Test Files → `tests/`
 - `test_quick.py`
 - `test_simulation.py`
 - `test_backend.py`
 - `reproduce_bug.py`
 
-## ✅ 已完成的更新
+## ✅ Completed Updates
 
-### 1. 脚本路径更新
-所有脚本文件已更新，现在可以从 `scripts/` 目录正确访问项目根目录：
-- Windows 批处理文件：使用 `cd /d %~dp0..` 返回项目根目录
-- Linux/Mac Shell 脚本：使用 `cd "$(dirname "$0")/.."` 返回项目根目录
+### 1. Script Path Updates
+All script files have been updated to correctly access the project root directory from the `scripts/` directory:
+- Windows batch files: Use `cd /d %~dp0..` to return to project root
+- Linux/Mac shell scripts: Use `cd "$(dirname "$0")/.."` to return to project root
 
-### 2. 文档路径更新
-- `README.md` - 更新了项目结构和脚本路径引用
-- `docs/QUICK_START.md` - 更新了脚本路径
-- `docs/RUN_GUIDE.md` - 更新了脚本路径和文档链接
-- `docs/TESTING.md` - 更新了测试文件路径
+### 2. Documentation Path Updates
+- `README.md` - Updated project structure and script path references
+- `docs/QUICK_START.md` - Updated script paths
+- `docs/RUN_GUIDE.md` - Updated script paths and document links
+- `docs/TESTING.md` - Updated test file paths
 
-### 3. 新增文档
-- `docs/README.md` - 文档索引，帮助快速找到所需文档
+### 3. New Documents
+- `docs/README.md` - Documentation index to help quickly find needed documents
 
-## 📝 使用说明
+## 📝 Usage Instructions
 
-### 运行脚本
-现在所有脚本都在 `scripts/` 目录下，使用方法：
+### Running Scripts
+All scripts are now in the `scripts/` directory. Usage:
 
 **Windows**:
 ```bash
-# 双击运行，或在命令行执行
+# Double-click to run, or execute in command line
 scripts\start_backend.bat
 scripts\start_frontend.bat
 scripts\run_tests.bat
@@ -110,40 +110,39 @@ chmod +x scripts/*.sh
 ./scripts/run_tests.sh
 ```
 
-### 查看文档
-所有文档都在 `docs/` 目录下：
-- 查看文档索引：`docs/README.md`
-- 快速启动：`docs/QUICK_START.md`
-- 详细指南：`docs/RUN_GUIDE.md`
+### Viewing Documentation
+All documentation is in the `docs/` directory:
+- View documentation index: `docs/README.md`
+- Quick start: `docs/QUICK_START.md`
+- Detailed guide: `docs/RUN_GUIDE.md`
 
-### 运行测试
-所有测试文件都在 `tests/` 目录下：
+### Running Tests
+All test files are in the `tests/` directory:
 ```bash
-# 快速测试
+# Quick test
 python tests/test_quick.py
 
-# 完整测试套件
+# Full test suite
 python tests/run_tests.py
 
-# 或使用脚本
+# Or use scripts
 scripts/run_tests.bat  # Windows
 ./scripts/run_tests.sh  # Linux/Mac
 ```
 
-## 🎯 整理优势
+## 🎯 Organization Benefits
 
-1. **结构清晰** - 按功能分类，易于查找
-2. **易于维护** - 相关文件集中管理
-3. **路径统一** - 所有脚本和文档路径已更新
-4. **文档完善** - 新增文档索引，方便导航
+1. **Clear Structure** - Organized by functionality, easy to find
+2. **Easy Maintenance** - Related files are centrally managed
+3. **Unified Paths** - All script and documentation paths have been updated
+4. **Complete Documentation** - New documentation index for easy navigation
 
-## 📌 注意事项
+## 📌 Notes
 
-- 所有脚本已更新路径，可以直接从 `scripts/` 目录运行
-- 文档中的路径引用已更新，但建议从项目根目录查看文档
-- 工具脚本在 `tools/` 目录，通常从项目根目录运行
+- All scripts have been updated with paths and can be run directly from the `scripts/` directory
+- Path references in documentation have been updated, but it's recommended to view documents from the project root
+- Tool scripts are in the `tools/` directory and are usually run from the project root
 
 ---
 
-**整理完成日期**: 2025-12-25
-
+**Organization Completed Date**: 2025-12-25
