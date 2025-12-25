@@ -156,20 +156,31 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
     ctx.fillRect(0, 0, width, height);
 
     const env = state.environment;
-    const landWidth = width * (1 - env.ice_coverage);
 
-    // Draw land
-    ctx.fillStyle = '#2a2a3a';
-    ctx.fillRect(0, 0, landWidth, height);
-
-    // Draw sea
+    // Draw sea (background)
     ctx.fillStyle = '#1a3a5a';
-    ctx.fillRect(landWidth, 0, width - landWidth, height);
+    ctx.fillRect(0, 0, width, height);
 
-    // Draw ice layer (if temperature is low enough)
-    if (env.temperature < -5) {
-      ctx.fillStyle = `rgba(200, 220, 255, ${Math.min(0.5, Math.abs(env.temperature) / 20)})`;
-      ctx.fillRect(landWidth, 0, width - landWidth, height);
+    // Draw Ice Floes (Islands)
+    if (env.ice_floes) {
+      env.ice_floes.forEach(floe => {
+        ctx.fillStyle = '#eef4ff'; // White-ish ice color
+        ctx.beginPath();
+        ctx.arc(floe.x, floe.y, floe.radius, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Optional: nice stroke
+        ctx.strokeStyle = '#cce0ff';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      });
+    }
+
+    // Draw global ice layer (if extremely cold, maybe overlay everywhere?)
+    // For now, let's keep the scene clear to see the islands
+    if (env.temperature < -20) {
+      ctx.fillStyle = `rgba(255, 255, 255, 0.2)`;
+      ctx.fillRect(0, 0, width, height);
     }
 
     // Draw fish
@@ -241,7 +252,7 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
     ctx.fillText(`Seals: ${state.seals.length}`, 10, 60);
     ctx.fillText(`Fish: ${state.fish.length}`, 10, 80);
     ctx.fillText(`Temperature: ${state.environment.temperature.toFixed(1)}°C`, 10, 100);
-    ctx.fillText(`Ice Coverage: ${(state.environment.ice_coverage * 100).toFixed(1)}%`, 10, 120);
+    ctx.fillText(`Season: ${(state.environment.season / 1000).toFixed(1)}`, 10, 120);
   };
 
   return (

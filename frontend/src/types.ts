@@ -19,6 +19,7 @@ export interface Environment {
   temperature: number;
   sea_level: number;
   season: number;
+  ice_floes?: { x: number; y: number; radius: number }[];
 }
 
 export interface WorldState {

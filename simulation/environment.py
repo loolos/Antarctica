@@ -10,17 +10,40 @@ class Environment:
     """Environment state"""
     width: int = 800
     height: int = 600
-    ice_coverage: float = 0.8  # Ice coverage 0-1
-    temperature: float = -10.0  # Temperature in Celsius
-    sea_level: float = 100.0  # Sea level height
-    season: int = 0  # Season (0-3: Spring, Summer, Autumn, Winter)
-    
+    ice_coverage: float = 0.8
+    temperature: float = -10.0
+    sea_level: float = 100.0
+    season: int = 0
+    ice_floes: list = None  # List of dicts: {'x': float, 'y': float, 'radius': float}
+
+    def __post_init__(self):
+        if self.ice_floes is None:
+            self.generate_ice_floes()
+
+    def generate_ice_floes(self):
+        """Generate random ice floes"""
+        import random
+        self.ice_floes = []
+        # Generate 5-8 random ice islands
+        num_floes = random.randint(5, 8)
+        for _ in range(num_floes):
+            self.ice_floes.append({
+                'x': random.uniform(100, self.width - 100),
+                'y': random.uniform(100, self.height - 100),
+                'radius': random.uniform(30, 80)
+            })
+
     def is_land(self, x: float, y: float) -> bool:
-        """Check if position is land"""
-        # Simplified: left side is land, right side is sea
-        # Can be calculated more complexly based on ice_coverage
-        land_threshold = self.width * (1 - self.ice_coverage)
-        return x < land_threshold
+        """Check if position is land (on any ice floe)"""
+        if not self.ice_floes:
+            return False
+            
+        for floe in self.ice_floes:
+            dx = x - floe['x']
+            dy = y - floe['y']
+            if dx*dx + dy*dy <= floe['radius']**2:
+                return True
+        return False
     
     def is_sea(self, x: float, y: float) -> bool:
         """Check if position is sea"""
@@ -28,11 +51,11 @@ class Environment:
     
     def get_ice_thickness(self, x: float, y: float) -> float:
         """Get ice thickness at position"""
-        if self.is_sea(x, y):
-            # Sea area, calculate ice thickness based on temperature
-            if self.temperature < -5:
-                return min(1.0, abs(self.temperature) / 20.0)
-            return 0.0
+        if self.is_land(x, y):
+            return 2.0 # Land is thick ice
+            
+        if self.temperature < -5:
+            return min(1.0, abs(self.temperature) / 20.0)
         return 0.0
     
     def tick(self):
@@ -51,9 +74,11 @@ class Environment:
         else:  # Winter
             self.temperature = 0 - (season_factor - 3) * 10
         
-        # Temperature affects ice coverage
-        if self.temperature > 0:
-            self.ice_coverage = max(0.3, self.ice_coverage - 0.001)
-        else:
-            self.ice_coverage = min(0.9, self.ice_coverage + 0.001)
+        # Slowly drift ice floes
+        for floe in self.ice_floes:
+             # Very slow drift
+            floe['x'] += 0.01 
+            if floe['x'] > self.width:
+                floe['x'] = 0
+
 

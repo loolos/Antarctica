@@ -17,6 +17,8 @@ class Animal:
     age: int = 0
     max_energy: float = 100.0
     max_age: int = 1000
+    land_speed: float = 1.0
+    water_speed: float = 1.0
     
     def move(self, dx: float, dy: float, world_width: int, world_height: int):
         """Move the animal"""
@@ -43,7 +45,7 @@ class Animal:
     def tick(self):
         """Update each tick"""
         self.age += 1
-        self.consume_energy(0.5)  # Basal metabolic rate
+        self.consume_energy(0.05)  # Basal metabolic rate
 
 
 @dataclass
@@ -56,6 +58,8 @@ class Penguin(Animal):
     def __post_init__(self):
         self.max_energy = 150.0
         self.max_age = 800
+        self.land_speed = 2.0  # Agile on land
+        self.water_speed = 4.0  # Fast in water
     
     def can_breed(self) -> bool:
         """检查是否可以繁殖"""
@@ -80,13 +84,8 @@ class Penguin(Animal):
         if self.breeding_cooldown > 0:
             self.breeding_cooldown -= 1
         
-        # If energy is too low, try to go ashore
-        if self.energy < 30 and self.state == "sea":
-            self.state = "land"
-        # If energy is sufficient, can go to sea to catch fish
-        elif self.energy > 50 and self.state == "land" and random.random() < 0.1:
-            self.state = "sea"
-
+        # State transitions handled by engine based on location
+        
 
 @dataclass
 class Seal(Animal):
@@ -98,6 +97,8 @@ class Seal(Animal):
     def __post_init__(self):
         self.max_energy = 200.0
         self.max_age = 1200
+        self.land_speed = 0.5   # Clumsy on land
+        self.water_speed = 5.5  # Very fast in water
     
     def can_breed(self) -> bool:
         """Check if can breed"""
@@ -121,23 +122,18 @@ class Seal(Animal):
         super().tick()
         if self.breeding_cooldown > 0:
             self.breeding_cooldown -= 1
-        
-        # Seals mainly in the sea, occasionally come ashore to rest
-        if self.energy < 40 and self.state == "sea":
-            if random.random() < 0.2:
-                self.state = "land"
-        elif self.energy > 80 and self.state == "land" and random.random() < 0.3:
-            self.state = "sea"
 
 
 @dataclass
 class Fish(Animal):
     """Fish"""
-    speed: float = 1.0
+    speed: float = 1.0  # Deprecated, use water_speed
     
     def __post_init__(self):
         self.max_energy = 50.0
         self.max_age = 500
+        self.water_speed = 3.0
+        self.land_speed = 0.0 # Cannot move on land
     
     def tick(self):
         """Fish behavior each tick"""

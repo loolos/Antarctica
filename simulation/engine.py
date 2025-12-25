@@ -70,8 +70,25 @@ class SimulationEngine:
         # Handle breeding
         self._handle_breeding()
         
+        # Handle spontaneous generation
+        self._handle_spawning()
+        
         # Remove dead animals
         self._remove_dead_animals()
+    
+    def _handle_spawning(self):
+        """Handle spontaneous generation of animals"""
+        # Ensure minimum fish population
+        if len(self.world.fish) < 20:
+            if random.random() < 0.1: # 10% chance per tick to spawn a fish if low
+                self.world.fish.append(
+                    Fish(
+                        id=f"fish_spawn_{self.world.tick}_{random.randint(100,999)}",
+                        x=random.uniform(0, self.world.environment.width),
+                        y=random.uniform(0, self.world.environment.height),
+                        energy=random.uniform(20, 40)
+                    )
+                )
     
     def _update_animals(self):
         """Update all animals' states"""
@@ -91,50 +108,111 @@ class SimulationEngine:
             self._move_animal(fish)
     
     def _move_animal(self, animal):
-        """Move animal"""
-        if isinstance(animal, Fish):
-            # Fish swim randomly
-            dx = random.uniform(-animal.speed, animal.speed)
-            dy = random.uniform(-animal.speed, animal.speed)
-            animal.move(dx, dy, self.world.environment.width, self.world.environment.height)
+        """Move animal with physics and AI"""
+        # 1. Determine current terrain
+        is_on_land = self.world.environment.is_land(animal.x, animal.y)
         
-        elif isinstance(animal, Penguin):
-            # Penguins: random movement on land, search for fish in sea
-            if animal.state == "land":
-                dx = random.uniform(-2, 2)
-                dy = random.uniform(-2, 2)
-            else:  # sea
-                # Find nearest fish
-                nearest_fish = self._find_nearest(animal, self.world.fish, max_distance=50)
-                if nearest_fish:
-                    dx = (nearest_fish.x - animal.x) * 0.1
-                    dy = (nearest_fish.y - animal.y) * 0.1
-                else:
-                    dx = random.uniform(-1, 1)
-                    dy = random.uniform(-1, 1)
-            animal.move(dx, dy, self.world.environment.width, self.world.environment.height)
+        # Update animal state based on actual location
+        if is_on_land:
+            animal.state = "land"
+            speed = animal.land_speed
+        else:
+            animal.state = "sea"
+            speed = animal.water_speed
+            
+        # 2. AI Decision Making
+        dx, dy = 0, 0
+        target = None
         
-        elif isinstance(animal, Seal):
-            # Seals: hunt penguins or fish
-            if animal.state == "sea":
-                # Prioritize hunting penguins
-                nearest_penguin = self._find_nearest(animal, self.world.penguins, max_distance=80)
-                if nearest_penguin and nearest_penguin.state == "sea":
-                    dx = (nearest_penguin.x - animal.x) * 0.08
-                    dy = (nearest_penguin.y - animal.y) * 0.08
-                else:
-                    # Hunt fish
-                    nearest_fish = self._find_nearest(animal, self.world.fish, max_distance=60)
-                    if nearest_fish:
-                        dx = (nearest_fish.x - animal.x) * 0.1
-                        dy = (nearest_fish.y - animal.y) * 0.1
-                    else:
-                        dx = random.uniform(-1, 1)
-                        dy = random.uniform(-1, 1)
-            else:  # land
-                dx = random.uniform(-1, 1)
-                dy = random.uniform(-1, 1)
-            animal.move(dx, dy, self.world.environment.width, self.world.environment.height)
+        # Priorities:
+        # 1. Breeding/Resting (if needed and not on land)
+        needs_land = False
+        if isinstance(animal, (Penguin, Seal)):
+            if animal.breeding_cooldown == 0 and animal.energy > animal.max_energy * 0.8:
+                needs_land = True # Go to land to breed
+            elif animal.energy < animal.max_energy * 0.3:
+                needs_land = True # Go to land to rest
+        
+        if needs_land and not is_on_land:
+            # Find nearest ice floe center
+            floes = self.world.environment.ice_floes
+            if floes:
+                nearest_floe = min(floes, key=lambda f: (f['x']-animal.x)**2 + (f['y']-animal.y)**2)
+                # Move towards it
+                dx = nearest_floe['x'] - animal.x
+                dy = nearest_floe['y'] - animal.y
+        
+        # 2. Safety (Avoid Predators) - High Priority override
+        # Penguins should flee from Seals
+        if isinstance(animal, Penguin):
+            predators = [s for s in self.world.seals if s.is_alive()]
+            nearest_predator = self._find_nearest(animal, predators, max_distance=150) # Perception range
+            
+            if nearest_predator:
+                # Flee!
+                dx = animal.x - nearest_predator.x
+                dy = animal.y - nearest_predator.y
+                # If on land, flee less frantically? No, run for your life regardless.
+                # If in water, this effectively makes them swim away.
+                target = nearest_predator # Just to mark as "busy" so we don't hunt while fleeing
+        
+        # 3. Hunting (if hungry and in water, or Seal on land hunting Penguin)
+        if not target and (animal.energy < animal.max_energy * 0.9):
+            prey_type = None
+            if isinstance(animal, Penguin) and animal.state == "sea":
+                prey_type = Fish
+            elif isinstance(animal, Seal):
+                # Seals hunt Penguins everywhere (prioritized) or Fish in sea
+                prey_type = (Penguin, Fish) if animal.state == "sea" else Penguin
+            
+            if prey_type:
+                # Find prey (Global range for stronger AI)
+                potential_prey = []
+                if isinstance(prey_type, tuple):
+                    for t in prey_type:
+                        if t == Penguin: potential_prey.extend(self.world.penguins)
+                        if t == Fish: potential_prey.extend(self.world.fish)
+                elif prey_type == Penguin:
+                    potential_prey = self.world.penguins
+                elif prey_type == Fish:
+                    potential_prey = self.world.fish
+                
+                # Filter valid prey
+                valid_prey = [
+                    p for p in potential_prey 
+                    if p.is_alive() and p != animal and 
+                    (isinstance(p, Fish) or p.state == animal.state) # Hunt in same medium
+                ]
+                
+                target = self._find_nearest(animal, valid_prey, max_distance=300)
+                if target:
+                    dx = target.x - animal.x
+                    dy = target.y - animal.y
+        
+        # 3. Wandering (if no other drive)
+        if dx == 0 and dy == 0:
+            # Smooth random movement
+            dx = random.uniform(-10, 10)
+            dy = random.uniform(-10, 10)
+            
+            # Fish avoidance of land (simple bouncing)
+            if isinstance(animal, Fish):
+                # If near land, swim away
+                for floe in self.world.environment.ice_floes:
+                    dist_sq = (animal.x - floe['x'])**2 + (animal.y - floe['y'])**2
+                    if dist_sq < (floe['radius'] + 20)**2:
+                        # Swim away from center
+                        dx = animal.x - floe['x']
+                        dy = animal.y - floe['y']
+        
+        # Normalize and apply speed
+        dist = math.sqrt(dx*dx + dy*dy)
+        if dist > 0:
+            dx = (dx / dist) * speed
+            dy = (dy / dist) * speed
+        
+        # Apply movement
+        animal.move(dx, dy, self.world.environment.width, self.world.environment.height)
     
     def _find_nearest(self, animal, targets: List, max_distance: float = float('inf')):
         """Find nearest target"""

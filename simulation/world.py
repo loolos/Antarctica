@@ -62,6 +62,7 @@ class WorldState:
                 "temperature": self.environment.temperature,
                 "sea_level": self.environment.sea_level,
                 "season": self.environment.season,
+                "ice_floes": self.environment.ice_floes,
             }
         }
     

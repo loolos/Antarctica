@@ -41,7 +41,7 @@ if not exist "package.json" (
 
 REM Install dependencies if needed
 if not exist "node_modules" (
-    echo Installing dependencies (this may take a few minutes)...
+    echo Installing dependencies... this may take a few minutes.
     echo.
     call npm install --legacy-peer-deps
     if %ERRORLEVEL% NEQ 0 (

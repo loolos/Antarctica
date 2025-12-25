@@ -24,16 +24,25 @@ class TestEnvironment(unittest.TestCase):
     def test_land_detection(self):
         """测试陆地检测"""
         env = Environment(width=800, height=600, ice_coverage=0.8)
-        # 左侧应该是陆地
-        self.assertTrue(env.is_land(100, 300))
-        # 右侧应该是海洋
-        self.assertFalse(env.is_land(700, 300))
+        # Manually set ice floes for testing
+        env.ice_floes = [{'x': 100, 'y': 100, 'radius': 50}]
+        
+        # Center of floe should be land
+        self.assertTrue(env.is_land(100, 100))
+        # Edge (inside)
+        self.assertTrue(env.is_land(100 + 30, 100))
+        # Far away should be sea
+        self.assertFalse(env.is_land(500, 500))
     
     def test_sea_detection(self):
         """测试海洋检测"""
         env = Environment(width=800, height=600, ice_coverage=0.8)
-        self.assertFalse(env.is_sea(100, 300))
-        self.assertTrue(env.is_sea(700, 300))
+        env.ice_floes = [{'x': 100, 'y': 100, 'radius': 50}]
+        
+        # Center of floe should NOT be sea
+        self.assertFalse(env.is_sea(100, 100))
+        # Far away should be sea
+        self.assertTrue(env.is_sea(500, 500))
     
     def test_ice_thickness(self):
         """测试冰厚度计算"""
