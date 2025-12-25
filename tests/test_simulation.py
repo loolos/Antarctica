@@ -10,8 +10,9 @@ if sys.platform == 'win32':
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 
-# Add simulation module to path
-sys.path.insert(0, os.path.dirname(__file__))
+# Add project root to path (parent directory of tests/)
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, project_root)
 
 from simulation.engine import SimulationEngine
 

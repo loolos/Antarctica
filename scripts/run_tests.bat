@@ -2,6 +2,9 @@
 echo Running Tests...
 echo.
 
+REM Change to project root directory
+cd /d %~dp0..
+
 py tests/run_tests.py
 
 if %ERRORLEVEL% EQU 0 (

@@ -7,7 +7,9 @@ echo Starting Frontend...
 echo ========================================
 echo.
 
-cd /d %~dp0\frontend
+REM Change to project root directory
+cd /d %~dp0..
+cd frontend
 
 if not exist "node_modules" (
     echo Installing dependencies first...

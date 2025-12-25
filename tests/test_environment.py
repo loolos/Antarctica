@@ -47,9 +47,26 @@ class TestEnvironment(unittest.TestCase):
     def test_ice_thickness(self):
         """测试冰厚度计算"""
         env = Environment(width=800, height=600, temperature=-10)
-        thickness = env.get_ice_thickness(700, 300)
+        # Test sea ice thickness (not on land)
+        # Find a position that's definitely sea (not on any ice floe)
+        sea_x, sea_y = 700, 300
+        # Make sure it's not on land by checking
+        if env.is_land(sea_x, sea_y):
+            # If it's on land, find another position
+            sea_x, sea_y = 750, 500
+        
+        thickness = env.get_ice_thickness(sea_x, sea_y)
         self.assertGreaterEqual(thickness, 0)
-        self.assertLessEqual(thickness, 1)
+        # Sea ice thickness should be <= 1.0 (land ice is 2.0, but we're testing sea)
+        self.assertLessEqual(thickness, 1.0)
+        
+        # Test land ice thickness (should be 2.0)
+        # Find a position on land
+        if env.ice_floes:
+            land_floe = env.ice_floes[0]
+            land_x, land_y = land_floe['x'], land_floe['y']
+            land_thickness = env.get_ice_thickness(land_x, land_y)
+            self.assertEqual(land_thickness, 2.0, "Land ice thickness should be 2.0")
     
     def test_environment_tick(self):
         """测试环境更新"""

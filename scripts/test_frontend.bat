@@ -3,6 +3,8 @@ chcp 65001 >nul
 echo Testing Frontend Setup...
 echo.
 
+REM Change to project root directory
+cd /d %~dp0..
 cd frontend
 
 echo Checking Node.js...

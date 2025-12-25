@@ -2,6 +2,8 @@
 echo "Running Tests..."
 echo ""
 
+# Change to project root directory
+cd "$(dirname "$0")/.."
 python3 tests/run_tests.py
 
 if [ $? -eq 0 ]; then

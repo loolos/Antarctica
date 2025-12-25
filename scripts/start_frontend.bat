@@ -7,8 +7,8 @@ echo Starting Frontend Service...
 echo ========================================
 echo.
 
-REM Change to script directory
-cd /d %~dp0
+REM Change to project root directory
+cd /d %~dp0..
 
 REM Check Node.js
 where node >nul 2>&1

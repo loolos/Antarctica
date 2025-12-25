@@ -2,12 +2,15 @@
 
 ## Test Types
 
-### 1. Quick Test (`test_quick.py`)
+### 1. Quick Test (`tests/test_quick.py`)
 Simple functionality verification test, suitable for quickly checking if the system works correctly.
 
 **Run Method**:
 ```bash
-python test_quick.py
+python tests/test_quick.py
+# or using script
+scripts/run_tests.bat  # Windows
+./scripts/run_tests.sh  # Linux/Mac
 ```
 
 **Test Content**:
@@ -36,12 +39,12 @@ python -m unittest tests.test_engine
 python -m unittest tests.test_integration
 ```
 
-### 3. Integration Test (`test_simulation.py`)
+### 3. Integration Test (`tests/test_simulation.py`)
 Simple end-to-end test, verifies the entire simulation flow.
 
 **Run Method**:
 ```bash
-python test_simulation.py
+python tests/test_simulation.py
 ```
 
 ## Test Coverage Details

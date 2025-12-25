@@ -1,5 +1,7 @@
 #!/bin/bash
 echo "Starting Backend Server..."
+# Change to project root directory
+cd "$(dirname "$0")/.."
 cd backend
 python3 -m venv venv
 source venv/bin/activate

@@ -37,7 +37,9 @@ def test_backend():
     # 检查依赖
     print("\n检查Python模块...")
     try:
-        sys.path.insert(0, os.path.dirname(__file__))
+        # Add project root to path
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        sys.path.insert(0, project_root)
         from simulation.engine import SimulationEngine
         print("✅ simulation模块导入成功")
     except Exception as e:

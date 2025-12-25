@@ -33,6 +33,20 @@ A three-layer architecture Antarctic ecosystem simulator featuring penguins, sea
 
 ## Quick Start
 
+> **For detailed instructions, see [docs/QUICK_START.md](docs/QUICK_START.md)**
+
+### Using Scripts (Easiest)
+
+**Windows**:
+- Double-click `scripts/start_backend.bat` to start backend
+- Double-click `scripts/start_frontend.bat` to start frontend
+
+**Linux/Mac**:
+```bash
+./scripts/start_backend.sh
+./scripts/start_frontend.sh
+```
+
 ### Install Dependencies
 
 **Backend**:
@@ -67,7 +81,7 @@ Visit `http://localhost:3000` to view the visualization interface.
 
 **Quick Test (Recommended)**:
 ```bash
-python test_quick.py
+python tests/test_quick.py
 ```
 
 **Full Test Suite**:
@@ -82,6 +96,15 @@ python -m unittest discover tests
 python -m unittest tests.test_animals
 python -m unittest tests.test_engine
 python -m unittest tests.test_integration
+```
+
+**Using Scripts**:
+```bash
+# Windows
+scripts\run_tests.bat
+
+# Linux/Mac
+./scripts/run_tests.sh
 ```
 
 Test Coverage:
@@ -172,8 +195,20 @@ Antarctica/
 │   │   ├── hooks/       # Custom Hooks
 │   │   └── types.ts     # Type definitions
 │   └── package.json
-├── start_backend.bat    # Windows startup script
-├── start_frontend.bat   # Windows startup script
+├── tests/               # Test files
+│   ├── test_*.py        # Unit tests
+│   └── run_tests.py     # Test runner
+├── scripts/             # Startup and utility scripts
+│   ├── start_backend.bat/sh
+│   ├── start_frontend.bat/sh
+│   └── run_tests.bat/sh
+├── tools/               # Development tools
+│   └── *.py, *.js       # Utility scripts
+├── docs/                # Documentation
+│   ├── QUICK_START.md
+│   ├── RUN_GUIDE.md
+│   ├── ARCHITECTURE.md
+│   └── TESTING.md
 └── README.md
 ```
 

@@ -10,8 +10,9 @@ if sys.platform == 'win32':
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 
-# Add simulation module to path
-sys.path.insert(0, os.path.dirname(__file__))
+# Add project root to path (parent directory of tests/)
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, project_root)
 
 def test_imports():
     """Test module imports"""
@@ -103,9 +104,17 @@ def test_environment():
         assert 0 <= env.ice_coverage <= 1, "Ice coverage should be between 0-1"
         print(f"  ✅ Environment initialization normal")
         
-        # Test land detection
-        assert env.is_land(100, 300), "Left side should be land"
-        assert not env.is_land(700, 300), "Right side should be sea"
+        # Test land detection - use actual ice floe positions
+        # Since ice floes are randomly generated, test with known positions
+        if env.ice_floes:
+            # Test with first ice floe center (should be land)
+            floe = env.ice_floes[0]
+            assert env.is_land(floe['x'], floe['y']), "Ice floe center should be land"
+            # Test position far from all floes (should be sea)
+            assert not env.is_land(750, 550), "Position far from floes should be sea"
+        else:
+            # If no ice floes, all positions should be sea
+            assert not env.is_land(100, 300), "Without ice floes, should be sea"
         print(f"  ✅ Land/sea detection normal")
         
         # Test tick

@@ -5,7 +5,8 @@ echo Testing Backend Server Startup
 echo ========================================
 echo.
 
-cd /d %~dp0
+REM Change to project root directory
+cd /d %~dp0..
 
 REM Check virtual environment
 if not exist "backend\venv\Scripts\python.exe" (

@@ -3,7 +3,7 @@
 ## Easiest Way (Windows)
 
 ### 1️⃣ Start Backend
-Double-click `start_backend.bat`
+Double-click `scripts/start_backend.bat`
 
 Wait to see:
 ```
@@ -11,7 +11,7 @@ Uvicorn running on http://0.0.0.0:8000
 ```
 
 ### 2️⃣ Start Frontend (Open a new window)
-Double-click `start_frontend.bat`
+Double-click `scripts/start_frontend.bat`
 
 Wait to see:
 ```
@@ -45,4 +45,4 @@ npm start
 
 ## Need Help?
 
-Check `RUN_GUIDE.md` for detailed instructions and troubleshooting.
+Check [RUN_GUIDE.md](RUN_GUIDE.md) for detailed instructions and troubleshooting.

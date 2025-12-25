@@ -9,27 +9,27 @@
 **Step 1: Start Backend**
 ```bash
 # Double-click to run, or execute in command line:
-start_backend.bat
+scripts/start_backend.bat
 ```
 
 **Step 2: Start Frontend (Open a new terminal)**
 ```bash
 # Double-click to run, or execute in command line:
-start_frontend.bat
+scripts/start_frontend.bat
 ```
 
 #### Linux/Mac Users
 
 **Step 1: Start Backend**
 ```bash
-chmod +x start_backend.sh
-./start_backend.sh
+chmod +x scripts/start_backend.sh
+./scripts/start_backend.sh
 ```
 
 **Step 2: Start Frontend (Open a new terminal)**
 ```bash
-chmod +x start_frontend.sh
-./start_frontend.sh
+chmod +x scripts/start_frontend.sh
+./scripts/start_frontend.sh
 ```
 
 ---
@@ -215,6 +215,6 @@ Frontend supports hot reload by default, automatically refreshes after code chan
 
 ## Next Steps
 
-- View `README.md` to understand project architecture
-- View `ARCHITECTURE.md` for design details
-- View `TESTING.md` to learn how to run tests
+- View [README.md](../README.md) to understand project architecture
+- View [ARCHITECTURE.md](ARCHITECTURE.md) for design details
+- View [TESTING.md](TESTING.md) to learn how to run tests

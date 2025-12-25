@@ -3,6 +3,8 @@ chcp 65001 >nul
 echo ========================================
 echo Starting Backend Service...
 echo ========================================
+REM Change to project root directory
+cd /d %~dp0..
 cd backend
 
 REM Check if virtual environment exists
