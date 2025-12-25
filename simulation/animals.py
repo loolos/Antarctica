@@ -19,12 +19,44 @@ class Animal:
     max_age: int = 1000
     land_speed: float = 1.0
     water_speed: float = 1.0
+    # Behavior state tracking
+    behavior_state: str = "idle"  # idle, searching, targeting, fleeing, breeding, resting
+    hunt_direction_angle: float = 0.0  # Current hunting direction in radians
+    hunt_direction_ticks: int = 0  # How long to maintain current direction
+    last_x: float = 0.0  # Previous position for boundary detection
+    last_y: float = 0.0
+    flee_edge_direction: float = 0.0  # Direction along edge when fleeing (in radians)
+    target_id: str = ""  # ID of the target being tracked (for distance tracking)
     
     def move(self, dx: float, dy: float, world_width: int, world_height: int):
         """Move the animal"""
-        self.x = max(0, min(world_width - 1, self.x + dx))
-        self.y = max(0, min(world_height - 1, self.y + dy))
+        # Store previous position for boundary detection
+        self.last_x = self.x
+        self.last_y = self.y
+        
+        new_x = self.x + dx
+        new_y = self.y + dy
+        
+        # Boundary detection - if hitting edge, bounce back
+        hit_boundary = False
+        if new_x < 0:
+            new_x = 0
+            hit_boundary = True
+        elif new_x >= world_width:
+            new_x = world_width - 1
+            hit_boundary = True
+        if new_y < 0:
+            new_y = 0
+            hit_boundary = True
+        elif new_y >= world_height:
+            new_y = world_height - 1
+            hit_boundary = True
+        
+        self.x = new_x
+        self.y = new_y
         self.energy -= 0.1  # Movement consumes energy
+        
+        return hit_boundary  # Return if hit boundary
     
     def consume_energy(self, amount: float):
         """Consume energy"""
