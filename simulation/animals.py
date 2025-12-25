@@ -27,6 +27,7 @@ class Animal:
     last_y: float = 0.0
     flee_edge_direction: float = 0.0  # Direction along edge when fleeing (in radians)
     target_id: str = ""  # ID of the target being tracked (for distance tracking)
+    hunting_cooldown: int = 0  # Cooldown after successful predation (prevents immediate re-hunting)
     
     def move(self, dx: float, dy: float, world_width: int, world_height: int):
         """Move the animal"""
@@ -54,7 +55,7 @@ class Animal:
         
         self.x = new_x
         self.y = new_y
-        self.energy -= 0.1  # Movement consumes energy
+        self.energy -= 0.05  # Movement consumes energy (reduced by 50%)
         
         return hit_boundary  # Return if hit boundary
     
@@ -77,7 +78,7 @@ class Animal:
     def tick(self):
         """Update each tick"""
         self.age += 1
-        self.consume_energy(0.05)  # Basal metabolic rate
+        self.consume_energy(0.025)  # Basal metabolic rate (reduced by 50%)
 
 
 @dataclass
@@ -115,6 +116,8 @@ class Penguin(Animal):
         super().tick()
         if self.breeding_cooldown > 0:
             self.breeding_cooldown -= 1
+        if self.hunting_cooldown > 0:
+            self.hunting_cooldown -= 1
         
         # State transitions handled by engine based on location
         
@@ -154,6 +157,8 @@ class Seal(Animal):
         super().tick()
         if self.breeding_cooldown > 0:
             self.breeding_cooldown -= 1
+        if self.hunting_cooldown > 0:
+            self.hunting_cooldown -= 1
 
 
 @dataclass

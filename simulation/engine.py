@@ -31,6 +31,8 @@ class SimulationEngine:
             # Initialize position tracking for boundary detection
             penguin.last_x = penguin.x
             penguin.last_y = penguin.y
+            # Initialize hunting cooldown
+            penguin.hunting_cooldown = 0
             self.world.penguins.append(penguin)
         
         # Create initial seals (in the sea)
@@ -45,6 +47,8 @@ class SimulationEngine:
             # Initialize position tracking for boundary detection
             seal.last_x = seal.x
             seal.last_y = seal.y
+            # Initialize hunting cooldown
+            seal.hunting_cooldown = 0
             self.world.seals.append(seal)
         
         # Create initial fish (in the sea, not on ice floes)
@@ -263,10 +267,11 @@ class SimulationEngine:
         
         # 1.5. Update behavior state based on energy
         # Enter searching mode when energy drops below 60%
+        # But not if in hunting cooldown (recently ate)
         if isinstance(animal, (Penguin, Seal)):
             energy_percent = animal.energy / animal.max_energy
-            # Only change to searching if not fleeing or targeting
-            if energy_percent < 0.6 and animal.behavior_state not in ["fleeing", "targeting"]:
+            # Only change to searching if not fleeing, targeting, or in hunting cooldown
+            if energy_percent < 0.6 and animal.behavior_state not in ["fleeing", "targeting"] and animal.hunting_cooldown == 0:
                 if animal.behavior_state != "searching":
                     animal.behavior_state = "searching"  # 搜寻状态
                     # Initialize searching direction when entering searching mode
@@ -380,7 +385,8 @@ class SimulationEngine:
         # 3. Searching Behavior (搜寻状态) - when energy < 60%
         # Animals move in a direction for 3-8 seconds (15-40 ticks at 5 ticks/sec), then change direction
         # If they find food or hit boundary, change behavior
-        if not target and isinstance(animal, (Penguin, Seal)) and animal.behavior_state == "searching":
+        # But not if in hunting cooldown (recently ate)
+        if not target and isinstance(animal, (Penguin, Seal)) and animal.behavior_state == "searching" and animal.hunting_cooldown == 0:
             # Check if we need to set a new searching direction
             if animal.hunt_direction_ticks <= 0:
                 # Set new random direction (3-8 seconds = 15-40 ticks at 5 ticks/sec)
@@ -510,7 +516,8 @@ class SimulationEngine:
         
         # 3b. Regular Hunting (when not in searching/targeting mode, but still looking for food)
         # Penguins and Seals actively hunt even when not very hungry to explore and find food
-        if not target and isinstance(animal, (Penguin, Seal)) and animal.behavior_state not in ["searching", "targeting"]:
+        # But not if in hunting cooldown (recently ate)
+        if not target and isinstance(animal, (Penguin, Seal)) and animal.behavior_state not in ["searching", "targeting"] and animal.hunting_cooldown == 0:
             prey_type = None
             hunting_threshold = 1.0  # Always hunt (no energy threshold)
             
@@ -833,17 +840,18 @@ class SimulationEngine:
                     # Predation successful
                     seal.gain_energy(40)
                     self.world.penguins.remove(penguin)
+                    # Set hunting cooldown (10 seconds = 50 ticks at 5 ticks/sec)
+                    seal.hunting_cooldown = 50
                     # Update behavior state after successful predation
+                    # Clear target ID if in targeting state
                     if seal.behavior_state == "targeting":
                         seal.target_id = ""  # Clear target ID
+                    # Exit hunting states (searching or targeting) due to cooldown
+                    if seal.behavior_state in ["searching", "targeting"]:
                         energy_percent = seal.energy / seal.max_energy
-                        if energy_percent < 0.6:
-                            seal.behavior_state = "searching"  # 返回搜寻状态
-                            seal.hunt_direction_angle = random.uniform(0, 2 * math.pi)
-                            seal.hunt_direction_ticks = random.randint(15, 40)
-                        else:
-                            seal.behavior_state = "idle"
-                            seal.hunt_direction_ticks = 0
+                        # Can't enter searching state during cooldown
+                        seal.behavior_state = "idle"
+                        seal.hunt_direction_ticks = 0
                     break
         
         # Seals eat fish
@@ -857,19 +865,22 @@ class SimulationEngine:
                 
                 if seal.distance_to(fish) < 8:
                     # Predation successful
-                    seal.gain_energy(20)
+                    # Seals recover 10% of max energy from eating fish
+                    energy_recovery = seal.max_energy * 0.1
+                    seal.gain_energy(energy_recovery)
                     self.world.fish.remove(fish)
+                    # Set hunting cooldown (10 seconds = 50 ticks at 5 ticks/sec)
+                    seal.hunting_cooldown = 50
                     # Update behavior state after successful predation
+                    # Clear target ID if in targeting state
                     if seal.behavior_state == "targeting":
                         seal.target_id = ""  # Clear target ID
+                    # Exit hunting states (searching or targeting) due to cooldown
+                    if seal.behavior_state in ["searching", "targeting"]:
                         energy_percent = seal.energy / seal.max_energy
-                        if energy_percent < 0.6:
-                            seal.behavior_state = "searching"  # 返回搜寻状态
-                            seal.hunt_direction_angle = random.uniform(0, 2 * math.pi)
-                            seal.hunt_direction_ticks = random.randint(15, 40)
-                        else:
-                            seal.behavior_state = "idle"
-                            seal.hunt_direction_ticks = 0
+                        # Can't enter searching state during cooldown
+                        seal.behavior_state = "idle"
+                        seal.hunt_direction_ticks = 0
                     break
         
         # Penguins eat fish (in the sea)
@@ -883,19 +894,22 @@ class SimulationEngine:
                 
                 if penguin.distance_to(fish) < 5:
                     # Predation successful
-                    penguin.gain_energy(15)
+                    # Penguins recover 50% of max energy from eating fish
+                    energy_recovery = penguin.max_energy * 0.5
+                    penguin.gain_energy(energy_recovery)
                     self.world.fish.remove(fish)
+                    # Set hunting cooldown (10 seconds = 50 ticks at 5 ticks/sec)
+                    penguin.hunting_cooldown = 50
                     # Update behavior state after successful predation
+                    # Clear target ID if in targeting state
                     if penguin.behavior_state == "targeting":
                         penguin.target_id = ""  # Clear target ID
+                    # Exit hunting states (searching or targeting) due to cooldown
+                    if penguin.behavior_state in ["searching", "targeting"]:
                         energy_percent = penguin.energy / penguin.max_energy
-                        if energy_percent < 0.6:
-                            penguin.behavior_state = "searching"  # 返回搜寻状态
-                            penguin.hunt_direction_angle = random.uniform(0, 2 * math.pi)
-                            penguin.hunt_direction_ticks = random.randint(15, 40)
-                        else:
-                            penguin.behavior_state = "idle"
-                            penguin.hunt_direction_ticks = 0
+                        # Can't enter searching state during cooldown
+                        penguin.behavior_state = "idle"
+                        penguin.hunt_direction_ticks = 0
                     break
     
     def _handle_breeding(self):
