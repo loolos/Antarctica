@@ -1,48 +1,48 @@
 @echo off
 chcp 65001 >nul
 echo ========================================
-echo 测试后端服务器启动
+echo Testing Backend Server Startup
 echo ========================================
 echo.
 
 cd /d %~dp0
 
-REM 检查虚拟环境
+REM Check virtual environment
 if not exist "backend\venv\Scripts\python.exe" (
-    echo ❌ 虚拟环境不存在，请先运行 start_backend.bat
+    echo ❌ Virtual environment not found, please run start_backend.bat first
     pause
     exit /b 1
 )
 
-echo ✅ 虚拟环境存在
+echo ✅ Virtual environment exists
 echo.
 
-REM 测试导入
-echo 测试模块导入...
-backend\venv\Scripts\python.exe -c "import sys; sys.path.insert(0, '.'); from simulation.engine import SimulationEngine; print('✅ simulation模块导入成功')"
+REM Test imports
+echo Testing module imports...
+backend\venv\Scripts\python.exe -c "import sys; sys.path.insert(0, '.'); from simulation.engine import SimulationEngine; print('✅ simulation module imported successfully')"
 if errorlevel 1 (
-    echo ❌ simulation模块导入失败
+    echo ❌ simulation module import failed
     pause
     exit /b 1
 )
 
-backend\venv\Scripts\python.exe -c "import fastapi; import uvicorn; print('✅ FastAPI依赖已安装')"
+backend\venv\Scripts\python.exe -c "import fastapi; import uvicorn; print('✅ FastAPI dependencies installed')"
 if errorlevel 1 (
-    echo ❌ FastAPI依赖未安装
-    echo 正在安装...
+    echo ❌ FastAPI dependencies not installed
+    echo Installing...
     backend\venv\Scripts\python.exe -m pip install -r backend\requirements.txt
 )
 
 echo.
 echo ========================================
-echo ✅ 所有检查通过！
+echo ✅ All checks passed!
 echo ========================================
 echo.
-echo 正在启动服务器...
-echo 服务器地址: http://localhost:8000
-echo API文档: http://localhost:8000/docs
+echo Starting server...
+echo Server URL: http://localhost:8000
+echo API Documentation: http://localhost:8000/docs
 echo.
-echo 按 Ctrl+C 停止服务器
+echo Press Ctrl+C to stop the server
 echo ========================================
 echo.
 
@@ -50,4 +50,3 @@ cd backend
 ..\backend\venv\Scripts\python.exe main.py
 
 pause
-

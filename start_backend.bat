@@ -1,53 +1,52 @@
 @echo off
 chcp 65001 >nul
 echo ========================================
-echo 启动后端服务...
+echo Starting Backend Service...
 echo ========================================
 cd backend
 
-REM 检查虚拟环境是否存在
+REM Check if virtual environment exists
 if not exist venv (
-    echo 创建虚拟环境...
+    echo Creating virtual environment...
     py -m venv venv
     if errorlevel 1 (
-        echo 错误: 创建虚拟环境失败，请确保已安装Python
+        echo Error: Failed to create virtual environment, please ensure Python is installed
         pause
         exit /b 1
     )
 )
 
-REM 激活虚拟环境
+REM Activate virtual environment
 call venv\Scripts\activate.bat
 
-REM 检查依赖是否已安装
+REM Check if dependencies are installed
 if not exist venv\Scripts\fastapi.exe (
-    echo 安装依赖包...
+    echo Installing dependencies...
     py -m pip install --upgrade pip
     if errorlevel 1 (
-        echo 错误: pip升级失败
+        echo Error: pip upgrade failed
         pause
         exit /b 1
     )
     py -m pip install -r requirements.txt
     if errorlevel 1 (
-        echo 错误: 依赖安装失败
+        echo Error: Failed to install dependencies
         pause
         exit /b 1
     )
 ) else (
-    echo 依赖已安装，跳过...
+    echo Dependencies installed, skipping...
 )
 
 echo.
-echo 启动服务器...
-echo 后端地址: http://localhost:8000
-echo API文档: http://localhost:8000/docs
+echo Starting server...
+echo Backend URL: http://localhost:8000
+echo API Documentation: http://localhost:8000/docs
 echo.
-echo 按 Ctrl+C 停止服务器
+echo Press Ctrl+C to stop the server
 echo ========================================
 echo.
 
 py main.py
 
 pause
-
