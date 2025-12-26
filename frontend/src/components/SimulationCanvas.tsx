@@ -118,18 +118,67 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
     ctx.fillStyle = '#1a3a5a';
     ctx.fillRect(0, 0, width, height);
 
-    // Draw Ice Floes (Islands)
+    // Draw Ice Floes (Islands) with varied shapes
     if (env.ice_floes) {
       env.ice_floes.forEach(floe => {
         ctx.fillStyle = '#eef4ff'; // White-ish ice color
-        ctx.beginPath();
-        ctx.arc(floe.x, floe.y, floe.radius, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Optional: nice stroke
         ctx.strokeStyle = '#cce0ff';
         ctx.lineWidth = 2;
+        
+        const shape = floe.shape || 'circle';
+        const radiusX = floe.radius_x || floe.radius;
+        const radiusY = floe.radius_y || floe.radius;
+        const rotation = floe.rotation || 0;
+        
+        ctx.save();
+        ctx.translate(floe.x, floe.y);
+        ctx.rotate(rotation);
+        
+        ctx.beginPath();
+        
+        if (shape === 'circle') {
+          // Simple circle
+          ctx.arc(0, 0, floe.radius, 0, Math.PI * 2);
+        } else if (shape === 'ellipse') {
+          // Ellipse
+          ctx.ellipse(0, 0, radiusX, radiusY, 0, 0, Math.PI * 2);
+        } else if (shape === 'irregular') {
+          // Irregular shape: draw ellipse with wavy edges
+          const irregularity = floe.irregularity || 0.2;
+          const numPoints = 64; // Number of points for smooth curve
+          
+          for (let i = 0; i <= numPoints; i++) {
+            const angle = (i / numPoints) * Math.PI * 2;
+            // Base ellipse radius
+            let r = Math.sqrt(
+              Math.pow(radiusX * Math.cos(angle), 2) +
+              Math.pow(radiusY * Math.sin(angle), 2)
+            );
+            // Add irregularity using sine waves
+            const irregularFactor = 1.0 + irregularity * (
+              Math.sin(angle * 3) * Math.cos(angle * 2) * 0.5 +
+              Math.sin(angle * 5) * 0.3
+            );
+            r *= irregularFactor;
+            
+            const x = r * Math.cos(angle);
+            const y = r * Math.sin(angle);
+            
+            if (i === 0) {
+              ctx.moveTo(x, y);
+            } else {
+              ctx.lineTo(x, y);
+            }
+          }
+          ctx.closePath();
+        } else {
+          // Fallback to circle
+          ctx.arc(0, 0, floe.radius, 0, Math.PI * 2);
+        }
+        
+        ctx.fill();
         ctx.stroke();
+        ctx.restore();
       });
     }
 

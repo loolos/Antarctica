@@ -14,6 +14,17 @@ export interface Animal {
   is_juvenile?: boolean; // true if animal is still a juvenile
 }
 
+export interface IceFloe {
+  x: number;
+  y: number;
+  radius: number; // Bounding circle radius
+  shape?: 'circle' | 'ellipse' | 'irregular';
+  radius_x?: number;
+  radius_y?: number;
+  rotation?: number;
+  irregularity?: number;
+}
+
 export interface Environment {
   width: number;
   height: number;
@@ -21,7 +32,7 @@ export interface Environment {
   temperature: number;
   sea_level: number;
   season: number;
-  ice_floes?: { x: number; y: number; radius: number }[];
+  ice_floes?: IceFloe[];
 }
 
 export interface WorldState {

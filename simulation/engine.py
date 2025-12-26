@@ -509,137 +509,434 @@ class SimulationEngine:
             # Don't search if energy > high threshold (should be socializing on land instead)
             config = get_config()
             if energy_percent <= config.ENERGY_THRESHOLD_HIGH:
-                # Check if we need to set a new searching direction
-                if animal.hunt_direction_ticks <= 0:
-                    # Set new random direction (3-8 seconds = 15-40 ticks at 5 ticks/sec)
-                    config = get_config()
-                    animal.hunt_direction_ticks = random.randint(config.HUNTING_DIRECTION_TICKS_MIN, config.HUNTING_DIRECTION_TICKS_MAX)
-                    animal.hunt_direction_angle = random.uniform(0, 2 * math.pi)
+                # Special case: Seals on land with low energy should prioritize going to sea
+                if isinstance(animal, Seal) and is_on_land and energy_percent < config.ENERGY_THRESHOLD_HUNTING:
+                    # Find nearest sea position (move away from ice floes)
+                    nearest_floe = None
+                    min_dist = float('inf')
+                    for floe in self.world.environment.ice_floes:
+                        dist = math.sqrt((animal.x - floe['x'])**2 + (animal.y - floe['y'])**2)
+                        if dist < min_dist:
+                            min_dist = dist
+                            nearest_floe = floe
+                    
+                    if nearest_floe:
+                        # Move away from ice floe center toward sea
+                        dx = animal.x - nearest_floe['x']
+                        dy = animal.y - nearest_floe['y']
+                        # Normalize and scale
+                        dist = math.sqrt(dx*dx + dy*dy)
+                        if dist > 0:
+                            dx = (dx / dist) * 50  # Move 50 units away
+                            dy = (dy / dist) * 50
+                        else:
+                            # At center, pick random direction
+                            angle = random.uniform(0, 2 * math.pi)
+                            dx = math.cos(angle) * 50
+                            dy = math.sin(angle) * 50
+                    else:
+                        # No ice floe found, use normal searching
+                        if animal.hunt_direction_ticks <= 0:
+                            config = get_config()
+                            animal.hunt_direction_ticks = random.randint(config.HUNTING_DIRECTION_TICKS_MIN, config.HUNTING_DIRECTION_TICKS_MAX)
+                            animal.hunt_direction_angle = random.uniform(0, 2 * math.pi)
+                        animal.hunt_direction_ticks -= 1
+                        search_distance = 30 + random.uniform(0, 20)
+                        dx = math.cos(animal.hunt_direction_angle) * search_distance
+                        dy = math.sin(animal.hunt_direction_angle) * search_distance
+                else:
+                    # Normal searching behavior
+                    # Check if we need to set a new searching direction
+                    if animal.hunt_direction_ticks <= 0:
+                        # Set new random direction (3-8 seconds = 15-40 ticks at 5 ticks/sec)
+                        config = get_config()
+                        animal.hunt_direction_ticks = random.randint(config.HUNTING_DIRECTION_TICKS_MIN, config.HUNTING_DIRECTION_TICKS_MAX)
+                        animal.hunt_direction_angle = random.uniform(0, 2 * math.pi)
+                    
+                    # Decrease direction timer
+                    animal.hunt_direction_ticks -= 1
+                    
+                    # Move in the searching direction
+                    search_distance = 30 + random.uniform(0, 20)  # 30-50 units per step
+                    dx = math.cos(animal.hunt_direction_angle) * search_distance
+                    dy = math.sin(animal.hunt_direction_angle) * search_distance
                 
-                # Decrease direction timer
-                animal.hunt_direction_ticks -= 1
+                # Check for prey while searching (but not if seal is leaving land)
+                if not (isinstance(animal, Seal) and is_on_land and energy_percent < config.ENERGY_THRESHOLD_HUNTING):
+                    prey_type = None
+                    if isinstance(animal, Penguin) and animal.state == "sea":
+                        prey_type = Fish
+                    elif isinstance(animal, Seal):
+                        prey_type = (Penguin, Fish) if animal.state == "sea" else Penguin
                 
-                # Move in the searching direction
-                search_distance = 30 + random.uniform(0, 20)  # 30-50 units per step
-                dx = math.cos(animal.hunt_direction_angle) * search_distance
-                dy = math.sin(animal.hunt_direction_angle) * search_distance
-                
-                # Check for prey while searching
+                    if prey_type:
+                        potential_prey = []
+                        if isinstance(prey_type, tuple):
+                            for t in prey_type:
+                                if t == Penguin: potential_prey.extend(self.world.penguins)
+                                if t == Fish: potential_prey.extend(self.world.fish)
+                        elif prey_type == Penguin:
+                            potential_prey = self.world.penguins
+                        elif prey_type == Fish:
+                            potential_prey = self.world.fish
+                        
+                        # For seals, prioritize sea targets
+                        if isinstance(animal, Seal):
+                            sea_prey = [p for p in potential_prey 
+                                       if p.is_alive() and p != animal and 
+                                       (isinstance(p, Fish) or p.state == "sea")]
+                            land_prey = [p for p in potential_prey 
+                                        if p.is_alive() and p != animal and 
+                                        isinstance(p, Penguin) and p.state == "land"]
+                            
+                            # Prioritize sea targets if both are available
+                            config = get_config()
+                            sea_target = self._find_nearest(animal, sea_prey, max_distance=config.PREY_SEARCH_RANGE)
+                            land_target = self._find_nearest(animal, land_prey, max_distance=config.PREY_SEARCH_RANGE)
+                            
+                            # Prefer sea target if both are available
+                            if sea_target and land_target:
+                                nearby_prey = sea_target
+                            elif sea_target:
+                                nearby_prey = sea_target
+                            elif land_target:
+                                nearby_prey = land_target
+                            else:
+                                nearby_prey = None
+                        else:
+                            valid_prey = [
+                                p for p in potential_prey 
+                                if p.is_alive() and p != animal and 
+                                (isinstance(p, Fish) or p.state == animal.state)
+                            ]
+                            
+                            # Look for nearby prey
+                            config = get_config()
+                            nearby_prey = self._find_nearest(animal, valid_prey, max_distance=config.PREY_SEARCH_RANGE)
+                        
+                        if nearby_prey:
+                            # Found prey! Switch from searching to targeting (锁定状态)
+                            animal.behavior_state = "targeting"  # 锁定状态
+                            animal.target_id = nearby_prey.id  # Store target ID for tracking
+                            target = nearby_prey
+                            dx = nearby_prey.x - animal.x
+                            dy = nearby_prey.y - animal.y
+                            # Reset direction timer
+                            animal.hunt_direction_ticks = 0
+        
+        # 3a. Targeting prey (锁定状态) - when found prey during searching
+        if not target and isinstance(animal, (Penguin, Seal)) and animal.behavior_state == "targeting":
+            # Special case: Seals on land with low energy should prioritize going to sea instead of tracking
+            if isinstance(animal, Seal) and is_on_land:
+                config = get_config()
+                energy_percent = animal.energy / animal.max_energy
+                if energy_percent < config.ENERGY_THRESHOLD_HUNTING:
+                    # Abandon tracking and go to sea
+                    animal.behavior_state = "searching"
+                    animal.target_id = ""
+                    # Find nearest sea position
+                    nearest_floe = None
+                    min_dist = float('inf')
+                    for floe in self.world.environment.ice_floes:
+                        dist = math.sqrt((animal.x - floe['x'])**2 + (animal.y - floe['y'])**2)
+                        if dist < min_dist:
+                            min_dist = dist
+                            nearest_floe = floe
+                    
+                    if nearest_floe:
+                        # Move away from ice floe center toward sea
+                        dx = animal.x - nearest_floe['x']
+                        dy = animal.y - nearest_floe['y']
+                        dist = math.sqrt(dx*dx + dy*dy)
+                        if dist > 0:
+                            dx = (dx / dist) * 50
+                            dy = (dy / dist) * 50
+                        else:
+                            angle = random.uniform(0, 2 * math.pi)
+                            dx = math.cos(angle) * 50
+                            dy = math.sin(angle) * 50
+                    else:
+                        dx, dy = 0, 0
+                else:
+                    # Continue targeting normally
+                    prey_type = None
+                    if isinstance(animal, Penguin) and animal.state == "sea":
+                        prey_type = Fish
+                    elif isinstance(animal, Seal):
+                        prey_type = (Penguin, Fish) if animal.state == "sea" else Penguin
+                    
+                    if prey_type:
+                        potential_prey = []
+                        if isinstance(prey_type, tuple):
+                            for t in prey_type:
+                                if t == Penguin: potential_prey.extend(self.world.penguins)
+                                if t == Fish: potential_prey.extend(self.world.fish)
+                        elif prey_type == Penguin:
+                            potential_prey = self.world.penguins
+                        elif prey_type == Fish:
+                            potential_prey = self.world.fish
+                        
+                        # For seals, prioritize sea targets
+                        if isinstance(animal, Seal):
+                            sea_prey = [p for p in potential_prey 
+                                       if p.is_alive() and p != animal and 
+                                       (isinstance(p, Fish) or p.state == "sea")]
+                            land_prey = [p for p in potential_prey 
+                                        if p.is_alive() and p != animal and 
+                                        isinstance(p, Penguin) and p.state == "land"]
+                            
+                            # First check tracked target
+                            tracked_sea = None
+                            tracked_land = None
+                            if animal.target_id:
+                                for p in sea_prey:
+                                    if p.id == animal.target_id:
+                                        tracked_sea = p
+                                        break
+                                if not tracked_sea:
+                                    for p in land_prey:
+                                        if p.id == animal.target_id:
+                                            tracked_land = p
+                                            break
+                            
+                            # Prioritize tracked sea target, then any sea target, then tracked land target, then any land target
+                            config = get_config()
+                            if tracked_sea and animal.distance_to(tracked_sea) <= config.MAX_TRACKING_DISTANCE:
+                                target = tracked_sea
+                                dx = tracked_sea.x - animal.x
+                                dy = tracked_sea.y - animal.y
+                            else:
+                                # Look for any sea target first
+                                sea_target = self._find_nearest(animal, sea_prey, max_distance=config.MAX_TRACKING_DISTANCE)
+                                if sea_target:
+                                    target = sea_target
+                                    animal.target_id = sea_target.id
+                                    dx = sea_target.x - animal.x
+                                    dy = sea_target.y - animal.y
+                                elif tracked_land and animal.distance_to(tracked_land) <= config.MAX_TRACKING_DISTANCE:
+                                    target = tracked_land
+                                    dx = tracked_land.x - animal.x
+                                    dy = tracked_land.y - animal.y
+                                else:
+                                    # Look for any land target
+                                    land_target = self._find_nearest(animal, land_prey, max_distance=config.MAX_TRACKING_DISTANCE)
+                                    if land_target:
+                                        target = land_target
+                                        animal.target_id = land_target.id
+                                        dx = land_target.x - animal.x
+                                        dy = land_target.y - animal.y
+                                    else:
+                                        # No target found, give up
+                                        animal.target_id = ""
+                                        energy_percent = animal.energy / animal.max_energy
+                                        if energy_percent < config.ENERGY_THRESHOLD_HUNTING:
+                                            animal.behavior_state = "searching"
+                                            animal.hunt_direction_angle = random.uniform(0, 2 * math.pi)
+                                            animal.hunt_direction_ticks = random.randint(config.HUNTING_DIRECTION_TICKS_MIN, config.HUNTING_DIRECTION_TICKS_MAX)
+                                        else:
+                                            animal.behavior_state = "idle"
+                                            animal.hunt_direction_ticks = 0
+                        else:
+                            # For penguins, use original logic
+                            valid_prey = [
+                                p for p in potential_prey 
+                                if p.is_alive() and p != animal and 
+                                (isinstance(p, Fish) or p.state == animal.state)
+                            ]
+                            
+                            # First, try to find the specific target we were tracking (if we have a target_id)
+                            tracked_prey = None
+                            if animal.target_id:
+                                for p in valid_prey:
+                                    if p.id == animal.target_id:
+                                        tracked_prey = p
+                                        break
+                            
+                            # If we found the tracked prey, check distance
+                            if tracked_prey:
+                                distance_to_target = animal.distance_to(tracked_prey)
+                                config = get_config()
+                                max_tracking_distance = config.MAX_TRACKING_DISTANCE  # Maximum distance before giving up
+                                
+                                if distance_to_target <= max_tracking_distance:
+                                    # Target is still within range, continue tracking
+                                    target = tracked_prey
+                                    dx = tracked_prey.x - animal.x
+                                    dy = tracked_prey.y - animal.y
+                                else:
+                                    # Target is too far away, give up tracking
+                                    config = get_config()
+                                    animal.target_id = ""  # Clear target ID
+                                    energy_percent = animal.energy / animal.max_energy
+                                    if energy_percent < config.ENERGY_THRESHOLD_HUNTING:
+                                        animal.behavior_state = "searching"  # 返回搜寻状态
+                                        animal.hunt_direction_angle = random.uniform(0, 2 * math.pi)
+                                        animal.hunt_direction_ticks = random.randint(config.HUNTING_DIRECTION_TICKS_MIN, config.HUNTING_DIRECTION_TICKS_MAX)
+                                    else:
+                                        animal.behavior_state = "idle"
+                                        animal.hunt_direction_ticks = 0
+                            else:
+                                # Lost the specific target, look for any nearby prey
+                                # Look for nearby prey (within 300 units when targeting)
+                                nearby_prey = self._find_nearest(animal, valid_prey, max_distance=300)
+                                if nearby_prey:
+                                    # Found a new nearby prey, switch to it
+                                    target = nearby_prey
+                                    animal.target_id = nearby_prey.id  # Store the new target ID
+                                    dx = nearby_prey.x - animal.x
+                                    dy = nearby_prey.y - animal.y
+                                else:
+                                    # No prey found, give up tracking
+                                    config = get_config()
+                                    animal.target_id = ""  # Clear target ID
+                                    energy_percent = animal.energy / animal.max_energy
+                                    if energy_percent < config.ENERGY_THRESHOLD_HUNTING:
+                                        animal.behavior_state = "searching"  # 返回搜寻状态
+                                        animal.hunt_direction_angle = random.uniform(0, 2 * math.pi)
+                                        animal.hunt_direction_ticks = random.randint(config.HUNTING_DIRECTION_TICKS_MIN, config.HUNTING_DIRECTION_TICKS_MAX)
+                                    else:
+                                        animal.behavior_state = "idle"
+                                        animal.hunt_direction_ticks = 0
+            else:
+                # Continue targeting normally for non-seals or seals in sea
                 prey_type = None
                 if isinstance(animal, Penguin) and animal.state == "sea":
                     prey_type = Fish
                 elif isinstance(animal, Seal):
                     prey_type = (Penguin, Fish) if animal.state == "sea" else Penguin
-            
-            if prey_type:
-                potential_prey = []
-                if isinstance(prey_type, tuple):
-                    for t in prey_type:
-                        if t == Penguin: potential_prey.extend(self.world.penguins)
-                        if t == Fish: potential_prey.extend(self.world.fish)
-                elif prey_type == Penguin:
-                    potential_prey = self.world.penguins
-                elif prey_type == Fish:
-                    potential_prey = self.world.fish
                 
-                valid_prey = [
-                    p for p in potential_prey 
-                    if p.is_alive() and p != animal and 
-                    (isinstance(p, Fish) or p.state == animal.state)
-                ]
-                
-                # Look for nearby prey
-                config = get_config()
-                nearby_prey = self._find_nearest(animal, valid_prey, max_distance=config.PREY_SEARCH_RANGE)
-                if nearby_prey:
-                    # Found prey! Switch from searching to targeting (锁定状态)
-                    animal.behavior_state = "targeting"  # 锁定状态
-                    animal.target_id = nearby_prey.id  # Store target ID for tracking
-                    target = nearby_prey
-                    dx = nearby_prey.x - animal.x
-                    dy = nearby_prey.y - animal.y
-                    # Reset direction timer
-                    animal.hunt_direction_ticks = 0
-        
-        # 3a. Targeting prey (锁定状态) - when found prey during searching
-        if not target and isinstance(animal, (Penguin, Seal)) and animal.behavior_state == "targeting":
-            # Continue targeting - look for the prey we were chasing
-            prey_type = None
-            if isinstance(animal, Penguin) and animal.state == "sea":
-                prey_type = Fish
-            elif isinstance(animal, Seal):
-                prey_type = (Penguin, Fish) if animal.state == "sea" else Penguin
-            
-            if prey_type:
-                potential_prey = []
-                if isinstance(prey_type, tuple):
-                    for t in prey_type:
-                        if t == Penguin: potential_prey.extend(self.world.penguins)
-                        if t == Fish: potential_prey.extend(self.world.fish)
-                elif prey_type == Penguin:
-                    potential_prey = self.world.penguins
-                elif prey_type == Fish:
-                    potential_prey = self.world.fish
-                
-                valid_prey = [
-                    p for p in potential_prey 
-                    if p.is_alive() and p != animal and 
-                    (isinstance(p, Fish) or p.state == animal.state)
-                ]
-                
-                # First, try to find the specific target we were tracking (if we have a target_id)
-                tracked_prey = None
-                if animal.target_id:
-                    for p in valid_prey:
-                        if p.id == animal.target_id:
-                            tracked_prey = p
-                            break
-                
-                # If we found the tracked prey, check distance
-                if tracked_prey:
-                    distance_to_target = animal.distance_to(tracked_prey)
-                    config = get_config()
-                    max_tracking_distance = config.MAX_TRACKING_DISTANCE  # Maximum distance before giving up
+                if prey_type:
+                    potential_prey = []
+                    if isinstance(prey_type, tuple):
+                        for t in prey_type:
+                            if t == Penguin: potential_prey.extend(self.world.penguins)
+                            if t == Fish: potential_prey.extend(self.world.fish)
+                    elif prey_type == Penguin:
+                        potential_prey = self.world.penguins
+                    elif prey_type == Fish:
+                        potential_prey = self.world.fish
                     
-                    if distance_to_target <= max_tracking_distance:
-                        # Target is still within range, continue tracking
-                        target = tracked_prey
-                        dx = tracked_prey.x - animal.x
-                        dy = tracked_prey.y - animal.y
-                    else:
-                        # Target is too far away, give up tracking
+                    # For seals, prioritize sea targets
+                    if isinstance(animal, Seal):
+                        sea_prey = [p for p in potential_prey 
+                                   if p.is_alive() and p != animal and 
+                                   (isinstance(p, Fish) or p.state == "sea")]
+                        land_prey = [p for p in potential_prey 
+                                    if p.is_alive() and p != animal and 
+                                    isinstance(p, Penguin) and p.state == "land"]
+                        
+                        # First check tracked target
+                        tracked_sea = None
+                        tracked_land = None
+                        if animal.target_id:
+                            for p in sea_prey:
+                                if p.id == animal.target_id:
+                                    tracked_sea = p
+                                    break
+                            if not tracked_sea:
+                                for p in land_prey:
+                                    if p.id == animal.target_id:
+                                        tracked_land = p
+                                        break
+                        
+                        # Prioritize tracked sea target, then any sea target, then tracked land target, then any land target
                         config = get_config()
-                        animal.target_id = ""  # Clear target ID
-                        energy_percent = animal.energy / animal.max_energy
-                        if energy_percent < config.ENERGY_THRESHOLD_HUNTING:
-                            animal.behavior_state = "searching"  # 返回搜寻状态
-                            animal.hunt_direction_angle = random.uniform(0, 2 * math.pi)
-                            animal.hunt_direction_ticks = random.randint(config.HUNTING_DIRECTION_TICKS_MIN, config.HUNTING_DIRECTION_TICKS_MAX)
+                        if tracked_sea and animal.distance_to(tracked_sea) <= config.MAX_TRACKING_DISTANCE:
+                            target = tracked_sea
+                            dx = tracked_sea.x - animal.x
+                            dy = tracked_sea.y - animal.y
                         else:
-                            animal.behavior_state = "idle"
-                            animal.hunt_direction_ticks = 0
-                else:
-                    # Lost the specific target, look for any nearby prey
-                    # Look for nearby prey (within 300 units when targeting)
-                    nearby_prey = self._find_nearest(animal, valid_prey, max_distance=300)
-                    if nearby_prey:
-                        # Found a new nearby prey, switch to it
-                        target = nearby_prey
-                        animal.target_id = nearby_prey.id  # Store the new target ID
-                        dx = nearby_prey.x - animal.x
-                        dy = nearby_prey.y - animal.y
+                            # Look for any sea target first
+                            sea_target = self._find_nearest(animal, sea_prey, max_distance=config.MAX_TRACKING_DISTANCE)
+                            if sea_target:
+                                target = sea_target
+                                animal.target_id = sea_target.id
+                                dx = sea_target.x - animal.x
+                                dy = sea_target.y - animal.y
+                            elif tracked_land and animal.distance_to(tracked_land) <= config.MAX_TRACKING_DISTANCE:
+                                target = tracked_land
+                                dx = tracked_land.x - animal.x
+                                dy = tracked_land.y - animal.y
+                            else:
+                                # Look for any land target
+                                land_target = self._find_nearest(animal, land_prey, max_distance=config.MAX_TRACKING_DISTANCE)
+                                if land_target:
+                                    target = land_target
+                                    animal.target_id = land_target.id
+                                    dx = land_target.x - animal.x
+                                    dy = land_target.y - animal.y
+                                else:
+                                    # No target found, give up
+                                    animal.target_id = ""
+                                    energy_percent = animal.energy / animal.max_energy
+                                    if energy_percent < config.ENERGY_THRESHOLD_HUNTING:
+                                        animal.behavior_state = "searching"
+                                        animal.hunt_direction_angle = random.uniform(0, 2 * math.pi)
+                                        animal.hunt_direction_ticks = random.randint(config.HUNTING_DIRECTION_TICKS_MIN, config.HUNTING_DIRECTION_TICKS_MAX)
+                                    else:
+                                        animal.behavior_state = "idle"
+                                        animal.hunt_direction_ticks = 0
                     else:
-                        # No prey found, give up tracking
-                        config = get_config()
-                        animal.target_id = ""  # Clear target ID
-                        energy_percent = animal.energy / animal.max_energy
-                        if energy_percent < config.ENERGY_THRESHOLD_HUNTING:
-                            animal.behavior_state = "searching"  # 返回搜寻状态
-                            animal.hunt_direction_angle = random.uniform(0, 2 * math.pi)
-                            animal.hunt_direction_ticks = random.randint(config.HUNTING_DIRECTION_TICKS_MIN, config.HUNTING_DIRECTION_TICKS_MAX)
+                        # For penguins, use original logic
+                        valid_prey = [
+                            p for p in potential_prey 
+                            if p.is_alive() and p != animal and 
+                            (isinstance(p, Fish) or p.state == animal.state)
+                        ]
+                        
+                        # First, try to find the specific target we were tracking (if we have a target_id)
+                        tracked_prey = None
+                        if animal.target_id:
+                            for p in valid_prey:
+                                if p.id == animal.target_id:
+                                    tracked_prey = p
+                                    break
+                        
+                        # If we found the tracked prey, check distance
+                        if tracked_prey:
+                            distance_to_target = animal.distance_to(tracked_prey)
+                            config = get_config()
+                            max_tracking_distance = config.MAX_TRACKING_DISTANCE  # Maximum distance before giving up
+                            
+                            if distance_to_target <= max_tracking_distance:
+                                # Target is still within range, continue tracking
+                                target = tracked_prey
+                                dx = tracked_prey.x - animal.x
+                                dy = tracked_prey.y - animal.y
+                            else:
+                                # Target is too far away, give up tracking
+                                config = get_config()
+                                animal.target_id = ""  # Clear target ID
+                                energy_percent = animal.energy / animal.max_energy
+                                if energy_percent < config.ENERGY_THRESHOLD_HUNTING:
+                                    animal.behavior_state = "searching"  # 返回搜寻状态
+                                    animal.hunt_direction_angle = random.uniform(0, 2 * math.pi)
+                                    animal.hunt_direction_ticks = random.randint(config.HUNTING_DIRECTION_TICKS_MIN, config.HUNTING_DIRECTION_TICKS_MAX)
+                                else:
+                                    animal.behavior_state = "idle"
+                                    animal.hunt_direction_ticks = 0
                         else:
-                            animal.behavior_state = "idle"
-                            animal.hunt_direction_ticks = 0
+                            # Lost the specific target, look for any nearby prey
+                            # Look for nearby prey (within 300 units when targeting)
+                            nearby_prey = self._find_nearest(animal, valid_prey, max_distance=300)
+                            if nearby_prey:
+                                # Found a new nearby prey, switch to it
+                                target = nearby_prey
+                                animal.target_id = nearby_prey.id  # Store the new target ID
+                                dx = nearby_prey.x - animal.x
+                                dy = nearby_prey.y - animal.y
+                            else:
+                                # No prey found, give up tracking
+                                config = get_config()
+                                animal.target_id = ""  # Clear target ID
+                                energy_percent = animal.energy / animal.max_energy
+                                if energy_percent < config.ENERGY_THRESHOLD_HUNTING:
+                                    animal.behavior_state = "searching"  # 返回搜寻状态
+                                    animal.hunt_direction_angle = random.uniform(0, 2 * math.pi)
+                                    animal.hunt_direction_ticks = random.randint(config.HUNTING_DIRECTION_TICKS_MIN, config.HUNTING_DIRECTION_TICKS_MAX)
+                                else:
+                                    animal.behavior_state = "idle"
+                                    animal.hunt_direction_ticks = 0
         
         # 3b. Regular Hunting (when not in searching/targeting mode, but still looking for food)
         # Penguins and Seals actively hunt even when not very hungry to explore and find food
