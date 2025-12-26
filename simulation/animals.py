@@ -73,7 +73,8 @@ class Animal:
     
     def is_alive(self) -> bool:
         """Check if alive"""
-        return self.energy > 0 and self.age < self.max_age
+        # No age limit - animals only die from energy depletion
+        return self.energy > 0
     
     def distance_to(self, other: 'Animal') -> float:
         """Calculate distance to another animal"""

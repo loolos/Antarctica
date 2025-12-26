@@ -968,13 +968,18 @@ class SimulationEngine:
     
     def _handle_predation(self):
         """Handle predation"""
-        # Seals eat penguins (in the sea)
+        # Seals eat penguins (both in sea and on land/ice floes)
+        # Seals can hunt penguins anywhere they meet
         for seal in self.world.seals[:]:
-            if seal.state != "sea" or not seal.is_alive():
+            if not seal.is_alive():
                 continue
             
             for penguin in self.world.penguins[:]:
-                if penguin.state != "sea" or not penguin.is_alive():
+                if not penguin.is_alive():
+                    continue
+                
+                # Seals can hunt penguins in the same location (both in sea or both on land)
+                if seal.state != penguin.state:
                     continue
                 
                 if seal.distance_to(penguin) < 10:
@@ -1125,9 +1130,29 @@ class SimulationEngine:
                     self.spatial_grid.add(baby)
     
     def _remove_dead_animals(self):
-        """Remove dead animals"""
+        """
+        Remove dead animals from the world and spatial grid.
+        
+        Animals are considered dead if:
+        - Energy <= 0 (starvation)
+        - Age >= max_age (natural death from old age)
+        """
+        # Remove dead penguins
+        dead_penguins = [p for p in self.world.penguins if not p.is_alive()]
+        for penguin in dead_penguins:
+            self.spatial_grid.remove(penguin)
         self.world.penguins = [p for p in self.world.penguins if p.is_alive()]
+        
+        # Remove dead seals
+        dead_seals = [s for s in self.world.seals if not s.is_alive()]
+        for seal in dead_seals:
+            self.spatial_grid.remove(seal)
         self.world.seals = [s for s in self.world.seals if s.is_alive()]
+        
+        # Remove dead fish
+        dead_fish = [f for f in self.world.fish if not f.is_alive()]
+        for fish in dead_fish:
+            self.spatial_grid.remove(fish)
         self.world.fish = [f for f in self.world.fish if f.is_alive()]
     
     def get_state(self) -> WorldState:

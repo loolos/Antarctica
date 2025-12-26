@@ -228,38 +228,47 @@ def _find_nearest(
 
 ## 3. 设计模式建议
 
-### 3.1 策略模式 (Strategy Pattern)
+### 3.1 策略模式 (Strategy Pattern) ✅ **已实现**
 
 **应用场景**: 动物行为系统
 
+**状态**: 已实现基础框架，待完全集成到 `SimulationEngine`
+
+**实现内容**:
+- ✅ `simulation/behaviors/base.py` - 基础行为抽象类和上下文类
+- ✅ `simulation/behaviors/idle.py` - 空闲行为
+- ✅ `simulation/behaviors/searching.py` - 搜寻行为
+- ✅ `simulation/behaviors/targeting.py` - 锁定目标行为
+- ✅ `simulation/behaviors/fleeing.py` - 逃跑行为
+- ✅ `simulation/behaviors/social.py` - 社交行为
+- ✅ `simulation/behaviors/manager.py` - 行为管理器
+
+**架构设计**:
 ```python
 # simulation/behaviors/base.py
 from abc import ABC, abstractmethod
 
 class Behavior(ABC):
     @abstractmethod
-    def execute(self, animal: Animal, engine: SimulationEngine) -> None:
+    def execute(self, context: BehaviorContext) -> Tuple[float, float]:
+        """Execute behavior and return movement vector"""
+        pass
+    
+    @abstractmethod
+    def can_transition_to(self, context: BehaviorContext) -> bool:
+        """Check if animal can transition to this behavior"""
         pass
 
-# simulation/behaviors/fleeing.py
-class FleeingBehavior(Behavior):
-    def execute(self, animal: Animal, engine: SimulationEngine) -> None:
-        # 逃跑逻辑
+# simulation/behaviors/manager.py
+class BehaviorManager:
+    """Manages animal behaviors using Strategy pattern"""
+    def determine_behavior(self, context, current_state) -> str:
+        """Determine appropriate behavior based on priority"""
+        # Priority: fleeing > targeting > social > searching > idle
         pass
-
-# simulation/animals.py
-class Animal:
-    def __init__(self, ...):
-        self.behaviors: Dict[str, Behavior] = {}
-    
-    def set_behavior(self, state: str, behavior: Behavior):
-        self.behaviors[state] = behavior
-    
-    def update(self, engine: SimulationEngine):
-        behavior = self.behaviors.get(self.behavior_state)
-        if behavior:
-            behavior.execute(self, engine)
 ```
+
+**下一步**: 逐步将 `SimulationEngine._move_animal` 方法重构为使用 `BehaviorManager`
 
 ### 3.2 观察者模式 (Observer Pattern)
 
@@ -640,10 +649,10 @@ jobs:
 
 ### 🟡 中优先级（近期改进）
 
-5. **引入设计模式** - 策略模式、观察者模式等
-6. **性能优化** - 空间分区、对象池
+5. **引入设计模式** - ✅ 策略模式（基础框架已实现，待完全集成）
+6. **性能优化** - ✅ 空间分区（已实现）
 7. **完善测试** - 提高覆盖率，添加集成测试
-8. **改进文档** - API 文档、代码注释
+8. **改进文档** - ✅ API 文档、代码注释（已改进）
 
 ### 🟢 低优先级（长期改进）
 

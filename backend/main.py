@@ -242,7 +242,7 @@ async def get_speed(service: SimulationService = Depends(get_simulation_service)
     return {"speed": service.get_speed()}
 
 
-@app.websocket("/ws", tags=["WebSocket"])
+@app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     """
     WebSocket endpoint for real-time state updates
