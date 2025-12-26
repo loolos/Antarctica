@@ -7,6 +7,7 @@ from typing import List
 from .world import WorldState
 from .animals import Penguin, Seal, Fish
 from .environment import Environment
+from .config import get_config
 
 
 class SimulationEngine:
@@ -19,8 +20,9 @@ class SimulationEngine:
     
     def _initialize_world(self):
         """Initialize the world"""
+        config = get_config()
         # Create initial penguins with random positions and ages
-        for i in range(10):
+        for i in range(config.INITIAL_PENGUINS):
             # Random position anywhere on the map
             x = random.uniform(0, self.world.environment.width)
             y = random.uniform(0, self.world.environment.height)
@@ -56,7 +58,7 @@ class SimulationEngine:
             self.world.penguins.append(penguin)
         
         # Create initial seals with random positions and ages
-        for i in range(5):
+        for i in range(config.INITIAL_SEALS):
             # Random position anywhere on the map
             x = random.uniform(0, self.world.environment.width)
             y = random.uniform(0, self.world.environment.height)
@@ -88,7 +90,7 @@ class SimulationEngine:
             self.world.seals.append(seal)
         
         # Create initial fish (in the sea, not on ice floes)
-        for i in range(50):
+        for i in range(config.INITIAL_FISH):
             # Find a position in the sea (not on any ice floe)
             x, y = self._find_sea_position()
             self.world.fish.append(
@@ -197,12 +199,13 @@ class SimulationEngine:
         # 1. Breeding/Resting/Social (if needed and not on land)
         needs_land = False
         if isinstance(animal, (Penguin, Seal)):
+            config = get_config()
             energy_percent = animal.energy / animal.max_energy
-            if animal.breeding_cooldown == 0 and animal.energy > animal.max_energy * 0.8:
+            if animal.breeding_cooldown == 0 and energy_percent >= config.ENERGY_THRESHOLD_BREEDING:
                 needs_land = True # Go to land to breed
-            elif animal.energy < animal.max_energy * 0.3:
+            elif energy_percent < config.ENERGY_THRESHOLD_LOW:
                 needs_land = True # Go to land to rest
-            elif energy_percent > 0.9:
+            elif energy_percent > config.ENERGY_THRESHOLD_HIGH:
                 needs_land = True # Go to land for socializing when energy > 90%
         
         if needs_land and not is_on_land:
@@ -219,7 +222,8 @@ class SimulationEngine:
         if isinstance(animal, (Penguin, Seal)) and dx == 0 and dy == 0 and \
            animal.behavior_state not in ["fleeing", "targeting"]:
             energy_percent = animal.energy / animal.max_energy
-            has_energy_for_social = energy_percent > 0.6  # Only socialize when energy > 60%
+            config = get_config()
+            has_energy_for_social = energy_percent > config.ENERGY_THRESHOLD_SOCIAL  # Only socialize when energy > threshold
             
             if is_on_land:
                 # On land: Social behavior depends on energy level
@@ -317,18 +321,19 @@ class SimulationEngine:
         # But not if in hunting cooldown (recently ate) or energy > 90% (socializing)
         if isinstance(animal, (Penguin, Seal)):
             energy_percent = animal.energy / animal.max_energy
-            # Only change to searching if not fleeing, targeting, in hunting cooldown, or energy > 90%
-            if energy_percent < 0.6 and energy_percent <= 0.9 and animal.behavior_state not in ["fleeing", "targeting"] and animal.hunting_cooldown == 0:
+            # Only change to searching if not fleeing, targeting, in hunting cooldown, or energy > high threshold
+            config = get_config()
+            if energy_percent < config.ENERGY_THRESHOLD_HUNTING and energy_percent <= config.ENERGY_THRESHOLD_HIGH and animal.behavior_state not in ["fleeing", "targeting"] and animal.hunting_cooldown == 0:
                 if animal.behavior_state != "searching":
                     animal.behavior_state = "searching"  # 搜寻状态
                     # Initialize searching direction when entering searching mode
                     animal.hunt_direction_angle = random.uniform(0, 2 * math.pi)
                     animal.hunt_direction_ticks = random.randint(15, 40)
-            elif energy_percent >= 0.6 and animal.behavior_state == "searching":
+            elif energy_percent >= config.ENERGY_THRESHOLD_HUNTING and animal.behavior_state == "searching":
                 animal.behavior_state = "idle"
                 animal.hunt_direction_ticks = 0
-            # If energy > 90%, exit hunting states and go to idle (will go to land for socializing)
-            elif energy_percent > 0.9 and animal.behavior_state in ["searching", "targeting"]:
+            # If energy > high threshold, exit hunting states and go to idle (will go to land for socializing)
+            elif energy_percent > config.ENERGY_THRESHOLD_HIGH and animal.behavior_state in ["searching", "targeting"]:
                 animal.behavior_state = "idle"
                 animal.target_id = ""  # Clear target if targeting
                 animal.hunt_direction_ticks = 0
@@ -340,25 +345,28 @@ class SimulationEngine:
             # Perception range depends on location: smaller on land, larger in sea
             # On land, penguins have reduced awareness (harder to detect seals)
             # In sea, penguins have better awareness (easier to detect seals)
+            config = get_config()
             if is_on_land:
-                perception_range = 60  # Reduced perception on land (60 units instead of 150)
+                perception_range = config.PENGUIN_PERCEPTION_LAND
             else:
-                perception_range = 150  # Normal perception in sea
+                perception_range = config.PENGUIN_PERCEPTION_SEA
             nearest_predator = self._find_nearest(animal, predators, max_distance=perception_range)
             
             if nearest_predator and animal.behavior_state != "fleeing":
                 # Flee! Change to fleeing state (最高优先级: 逃跑 > 锁定 > 分散 > 捕食)
                 animal.behavior_state = "fleeing"
-                # Set flee cooldown to 15 ticks (3 seconds at 5 ticks/sec)
-                animal.flee_cooldown = 15
+                # Set flee cooldown (3 seconds at 5 ticks/sec)
+                config = get_config()
+                animal.flee_cooldown = config.FLEE_COOLDOWN_TICKS
                 
                 # Calculate base fleeing direction (away from predator)
                 base_dx = animal.x - nearest_predator.x
                 base_dy = animal.y - nearest_predator.y
                 base_flee_angle = math.atan2(base_dy, base_dx) if (base_dx != 0 or base_dy != 0) else random.uniform(0, 2 * math.pi)
                 
-                # Add random variation to fleeing direction (±45 degrees = ±π/4)
-                angle_variation = random.uniform(-math.pi / 4, math.pi / 4)
+                # Add random variation to fleeing direction (±45 degrees)
+                config = get_config()
+                angle_variation = random.uniform(-config.FLEE_ANGLE_VARIATION, config.FLEE_ANGLE_VARIATION)
                 flee_angle = (base_flee_angle + angle_variation) % (2 * math.pi)
                 
                 # Constrain direction to avoid hitting boundaries
@@ -377,9 +385,10 @@ class SimulationEngine:
                 if animal.flee_cooldown > 0:
                     # Still fleeing: continue in fixed direction, don't change direction or stop
                     animal.flee_cooldown -= 1
-                    # Move in the fixed fleeing direction (30-50 units per step)
+                    # Move in the fixed fleeing direction
                     # Direction was already constrained when fleeing started, so use it directly
-                    flee_distance = 30 + random.uniform(0, 20)
+                    config = get_config()
+                    flee_distance = config.FLEE_DISTANCE_MIN + random.uniform(0, config.FLEE_DISTANCE_MAX - config.FLEE_DISTANCE_MIN)
                     dx = math.cos(animal.flee_edge_direction) * flee_distance
                     dy = math.sin(animal.flee_edge_direction) * flee_distance
                     # Re-apply boundary constraint to ensure we don't hit boundaries
@@ -388,12 +397,13 @@ class SimulationEngine:
                     # Note: We don't update flee_edge_direction here to keep it fixed for 3 seconds
                 else:
                     # 3 seconds passed, exit fleeing state
+                    config = get_config()
                     energy_percent = animal.energy / animal.max_energy
-                    if energy_percent < 0.6:
+                    if energy_percent < config.ENERGY_THRESHOLD_HUNTING:
                         animal.behavior_state = "searching"
                         # Initialize new searching direction
                         animal.hunt_direction_angle = random.uniform(0, 2 * math.pi)
-                        animal.hunt_direction_ticks = random.randint(15, 40)
+                        animal.hunt_direction_ticks = random.randint(config.HUNTING_DIRECTION_TICKS_MIN, config.HUNTING_DIRECTION_TICKS_MAX)
                     else:
                         animal.behavior_state = "idle"
                     animal.hunt_direction_ticks = 0
@@ -404,12 +414,14 @@ class SimulationEngine:
         # But not if in hunting cooldown (recently ate) or energy > 90% (socializing)
         if not target and isinstance(animal, (Penguin, Seal)) and animal.behavior_state == "searching" and animal.hunting_cooldown == 0:
             energy_percent = animal.energy / animal.max_energy
-            # Don't search if energy > 90% (should be socializing on land instead)
-            if energy_percent <= 0.9:
+            # Don't search if energy > high threshold (should be socializing on land instead)
+            config = get_config()
+            if energy_percent <= config.ENERGY_THRESHOLD_HIGH:
                 # Check if we need to set a new searching direction
                 if animal.hunt_direction_ticks <= 0:
                     # Set new random direction (3-8 seconds = 15-40 ticks at 5 ticks/sec)
-                    animal.hunt_direction_ticks = random.randint(15, 40)
+                    config = get_config()
+                    animal.hunt_direction_ticks = random.randint(config.HUNTING_DIRECTION_TICKS_MIN, config.HUNTING_DIRECTION_TICKS_MAX)
                     animal.hunt_direction_angle = random.uniform(0, 2 * math.pi)
                 
                 # Decrease direction timer
@@ -444,8 +456,9 @@ class SimulationEngine:
                     (isinstance(p, Fish) or p.state == animal.state)
                 ]
                 
-                # Look for nearby prey (within 200 units)
-                nearby_prey = self._find_nearest(animal, valid_prey, max_distance=200)
+                # Look for nearby prey
+                config = get_config()
+                nearby_prey = self._find_nearest(animal, valid_prey, max_distance=config.PREY_SEARCH_RANGE)
                 if nearby_prey:
                     # Found prey! Switch from searching to targeting (锁定状态)
                     animal.behavior_state = "targeting"  # 锁定状态
@@ -493,7 +506,8 @@ class SimulationEngine:
                 # If we found the tracked prey, check distance
                 if tracked_prey:
                     distance_to_target = animal.distance_to(tracked_prey)
-                    max_tracking_distance = 400  # Maximum distance before giving up
+                    config = get_config()
+                    max_tracking_distance = config.MAX_TRACKING_DISTANCE  # Maximum distance before giving up
                     
                     if distance_to_target <= max_tracking_distance:
                         # Target is still within range, continue tracking
@@ -502,12 +516,13 @@ class SimulationEngine:
                         dy = tracked_prey.y - animal.y
                     else:
                         # Target is too far away, give up tracking
+                        config = get_config()
                         animal.target_id = ""  # Clear target ID
                         energy_percent = animal.energy / animal.max_energy
-                        if energy_percent < 0.6:
+                        if energy_percent < config.ENERGY_THRESHOLD_HUNTING:
                             animal.behavior_state = "searching"  # 返回搜寻状态
                             animal.hunt_direction_angle = random.uniform(0, 2 * math.pi)
-                            animal.hunt_direction_ticks = random.randint(15, 40)
+                            animal.hunt_direction_ticks = random.randint(config.HUNTING_DIRECTION_TICKS_MIN, config.HUNTING_DIRECTION_TICKS_MAX)
                         else:
                             animal.behavior_state = "idle"
                             animal.hunt_direction_ticks = 0
@@ -523,12 +538,13 @@ class SimulationEngine:
                         dy = nearby_prey.y - animal.y
                     else:
                         # No prey found, give up tracking
+                        config = get_config()
                         animal.target_id = ""  # Clear target ID
                         energy_percent = animal.energy / animal.max_energy
-                        if energy_percent < 0.6:
+                        if energy_percent < config.ENERGY_THRESHOLD_HUNTING:
                             animal.behavior_state = "searching"  # 返回搜寻状态
                             animal.hunt_direction_angle = random.uniform(0, 2 * math.pi)
-                            animal.hunt_direction_ticks = random.randint(15, 40)
+                            animal.hunt_direction_ticks = random.randint(config.HUNTING_DIRECTION_TICKS_MIN, config.HUNTING_DIRECTION_TICKS_MAX)
                         else:
                             animal.behavior_state = "idle"
                             animal.hunt_direction_ticks = 0
@@ -538,8 +554,9 @@ class SimulationEngine:
         # But not if in hunting cooldown (recently ate) or energy > 90% (socializing)
         if not target and isinstance(animal, (Penguin, Seal)) and animal.behavior_state not in ["searching", "targeting"] and animal.hunting_cooldown == 0:
             energy_percent = animal.energy / animal.max_energy
-            # Don't hunt if energy > 90% (should be socializing on land instead)
-            if energy_percent <= 0.9:
+            # Don't hunt if energy > high threshold (should be socializing on land instead)
+            config = get_config()
+            if energy_percent <= config.ENERGY_THRESHOLD_HIGH:
                 prey_type = None
                 hunting_threshold = 1.0  # Always hunt (no energy threshold)
                 
@@ -568,8 +585,9 @@ class SimulationEngine:
                         (isinstance(p, Fish) or p.state == animal.state) # Hunt in same medium
                     ]
                     
-                    # Increased search range for better exploration (600 instead of 300)
-                    target = self._find_nearest(animal, valid_prey, max_distance=600)
+                    # Increased search range for better exploration
+                    config = get_config()
+                    target = self._find_nearest(animal, valid_prey, max_distance=config.PREY_EXPLORATION_RANGE)
                     if target:
                         dx = target.x - animal.x
                         dy = target.y - animal.y
@@ -679,7 +697,8 @@ class SimulationEngine:
                 # Add some randomness to avoid getting stuck
                 animal.hunt_direction_angle += random.uniform(-0.5, 0.5)
                 # Reset direction timer to continue in new direction
-                animal.hunt_direction_ticks = random.randint(15, 40)
+                config = get_config()
+                animal.hunt_direction_ticks = random.randint(config.HUNTING_DIRECTION_TICKS_MIN, config.HUNTING_DIRECTION_TICKS_MAX)
     
     def _constrain_direction_near_edge(self, animal, dx: float, dy: float):
         """Constrain movement direction when near screen edges
@@ -694,9 +713,10 @@ class SimulationEngine:
         Returns:
             Constrained dx, dy
         """
+        config = get_config()
         width = self.world.environment.width
         height = self.world.environment.height
-        edge_margin = 50  # Consider near edge if within this distance
+        edge_margin = config.EDGE_MARGIN  # Consider near edge if within this distance
         
         # Check which edge(s) we're near
         near_left = animal.x < edge_margin
@@ -812,10 +832,13 @@ class SimulationEngine:
                 
                 if seal.distance_to(penguin) < 10:
                     # Predation successful
-                    seal.gain_energy(40)
+                    config = get_config()
+                    # Seals get more energy from eating penguins than fish
+                    seal.gain_energy(config.SEAL_ENERGY_RECOVERY_FISH * 2)
                     self.world.penguins.remove(penguin)
-                    # Set hunting cooldown (10 seconds = 50 ticks at 5 ticks/sec)
-                    seal.hunting_cooldown = 50
+                    # Set hunting cooldown (10 seconds at 5 ticks/sec)
+                    config = get_config()
+                    seal.hunting_cooldown = config.HUNTING_COOLDOWN_TICKS
                     # Update behavior state after successful predation
                     # Clear target ID if in targeting state
                     if seal.behavior_state == "targeting":
@@ -839,12 +862,12 @@ class SimulationEngine:
                 
                 if seal.distance_to(fish) < 8:
                     # Predation successful
-                    # Seals recover 10% of max energy from eating fish
-                    energy_recovery = seal.max_energy * 0.1
-                    seal.gain_energy(energy_recovery)
+                    config = get_config()
+                    seal.gain_energy(config.SEAL_ENERGY_RECOVERY_FISH)
                     self.world.fish.remove(fish)
-                    # Set hunting cooldown (10 seconds = 50 ticks at 5 ticks/sec)
-                    seal.hunting_cooldown = 50
+                    # Set hunting cooldown (10 seconds at 5 ticks/sec)
+                    config = get_config()
+                    seal.hunting_cooldown = config.HUNTING_COOLDOWN_TICKS
                     # Update behavior state after successful predation
                     # Clear target ID if in targeting state
                     if seal.behavior_state == "targeting":
@@ -868,12 +891,11 @@ class SimulationEngine:
                 
                 if penguin.distance_to(fish) < 5:
                     # Predation successful
-                    # Penguins recover 50% of max energy from eating fish
-                    energy_recovery = penguin.max_energy * 0.5
-                    penguin.gain_energy(energy_recovery)
+                    config = get_config()
+                    penguin.gain_energy(config.PENGUIN_ENERGY_RECOVERY_FISH)
                     self.world.fish.remove(fish)
-                    # Set hunting cooldown (10 seconds = 50 ticks at 5 ticks/sec)
-                    penguin.hunting_cooldown = 50
+                    # Set hunting cooldown (10 seconds at 5 ticks/sec)
+                    penguin.hunting_cooldown = config.HUNTING_COOLDOWN_TICKS
                     # Update behavior state after successful predation
                     # Clear target ID if in targeting state
                     if penguin.behavior_state == "targeting":

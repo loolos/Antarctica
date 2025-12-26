@@ -2,12 +2,11 @@
 Backend service - FastAPI
 Provides REST API and WebSocket interfaces
 """
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Body
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 import asyncio
-import json
 from typing import List
 import sys
 import os
@@ -15,8 +14,7 @@ import os
 # Add simulation module to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from simulation.engine import SimulationEngine
-from simulation.world import WorldState
+from backend.service import SimulationService
 
 
 class SpeedRequest(BaseModel):
@@ -34,11 +32,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Global simulation engine instance
-simulation_engine = SimulationEngine()
-is_running = False
-simulation_speed = 1.0  # Speed multiplier (1.0 = normal, 5 ticks/sec)
-websocket_clients: List[WebSocket] = []
+# Global simulation service instance (singleton pattern)
+_simulation_service: SimulationService = None
+
+
+def get_simulation_service() -> SimulationService:
+    """Dependency injection for simulation service"""
+    global _simulation_service
+    if _simulation_service is None:
+        _simulation_service = SimulationService()
+    return _simulation_service
 
 
 @app.get("/")
@@ -48,83 +51,83 @@ async def root():
 
 
 @app.get("/state")
-async def get_state():
+async def get_state(service: SimulationService = Depends(get_simulation_service)):
     """Get current world state"""
-    state = simulation_engine.get_state()
+    state = service.get_state()
     return state.to_dict()
 
 
 @app.post("/step")
-async def step(n: int = 1):
+async def step(n: int = 1, service: SimulationService = Depends(get_simulation_service)):
     """Advance simulation N steps"""
-    if n < 1 or n > 100:
+    try:
+        service.step(n)
+        state = service.get_state()
+        return state.to_dict()
+    except ValueError as e:
         return JSONResponse(
             status_code=400,
-            content={"error": "n must be between 1 and 100"}
+            content={"error": str(e)}
         )
-    
-    simulation_engine.step(n)
-    state = simulation_engine.get_state()
-    return state.to_dict()
 
 
 @app.post("/reset")
-async def reset():
+async def reset(service: SimulationService = Depends(get_simulation_service)):
     """Reset simulation"""
-    global simulation_engine
-    simulation_engine = SimulationEngine()
+    service.reset()
     return {"message": "Simulation reset"}
 
 
 @app.post("/start")
-async def start():
+async def start(service: SimulationService = Depends(get_simulation_service)):
     """Start automatic running"""
-    global is_running
-    is_running = True
+    service.start()
     return {"message": "Simulation started"}
 
 
 @app.post("/stop")
-async def stop():
+async def stop(service: SimulationService = Depends(get_simulation_service)):
     """Stop automatic running"""
-    global is_running
-    is_running = False
+    service.stop()
     return {"message": "Simulation stopped"}
 
 
 @app.post("/speed")
-async def set_speed(request: SpeedRequest):
+async def set_speed(
+    request: SpeedRequest,
+    service: SimulationService = Depends(get_simulation_service)
+):
     """Set simulation speed multiplier
     
     Args:
         request: JSON body with speed field (0.1 to 10.0, where 1.0 = normal speed, 5 ticks/sec)
     """
-    global simulation_speed
-    speed = request.speed
-    if speed < 0.1 or speed > 10.0:
+    try:
+        service.set_speed(request.speed)
+        return {"message": f"Speed set to {request.speed}x", "speed": request.speed}
+    except ValueError as e:
         return JSONResponse(
             status_code=400,
-            content={"error": "Speed must be between 0.1 and 10.0"}
+            content={"error": str(e)}
         )
-    simulation_speed = speed
-    return {"message": f"Speed set to {speed}x", "speed": speed}
 
 
 @app.get("/speed")
-async def get_speed():
+async def get_speed(service: SimulationService = Depends(get_simulation_service)):
     """Get current simulation speed"""
-    return {"speed": simulation_speed}
+    return {"speed": service.get_speed()}
 
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     """WebSocket endpoint, push state updates in real-time"""
     await websocket.accept()
-    websocket_clients.append(websocket)
+    service = get_simulation_service()
+    service.add_websocket_client(websocket)
     
     try:
         # Send initial state
-        state = simulation_engine.get_state()
+        state = service.get_state()
         await websocket.send_json(state.to_dict())
         
         # Keep connection, wait for client messages
@@ -133,27 +136,27 @@ async def websocket_endpoint(websocket: WebSocket):
             if data == "ping":
                 await websocket.send_text("pong")
             elif data == "step":
-                simulation_engine.step(1)
-                state = simulation_engine.get_state()
+                service.step(1)
+                state = service.get_state()
                 await websocket.send_json(state.to_dict())
     except WebSocketDisconnect:
-        websocket_clients.remove(websocket)
+        service.remove_websocket_client(websocket)
 
 
 async def background_simulation():
     """Background simulation task with configurable speed"""
-    global is_running, simulation_speed
+    service = get_simulation_service()
     base_interval = 0.2  # Base interval for 1.0x speed (5 ticks per second)
     
     while True:
-        if is_running:
-            simulation_engine.step(1)
+        if service.is_running:
+            service.step(1)
             # Broadcast to all WebSocket clients
-            state = simulation_engine.get_state()
+            state = service.get_state()
             state_dict = state.to_dict()
             
             disconnected = []
-            for client in websocket_clients:
+            for client in service.get_websocket_clients():
                 try:
                     await client.send_json(state_dict)
                 except:
@@ -161,15 +164,14 @@ async def background_simulation():
             
             # Remove disconnected clients
             for client in disconnected:
-                if client in websocket_clients:
-                    websocket_clients.remove(client)
+                service.remove_websocket_client(client)
         
         # Calculate sleep interval based on speed multiplier
         # Higher speed = shorter interval = more ticks per second
         # speed = 1.0 -> 0.2s interval -> 5 ticks/sec
         # speed = 2.0 -> 0.1s interval -> 10 ticks/sec
         # speed = 0.5 -> 0.4s interval -> 2.5 ticks/sec
-        sleep_interval = base_interval / simulation_speed
+        sleep_interval = base_interval / service.speed
         # Clamp to reasonable bounds (min 0.01s, max 2.0s)
         sleep_interval = max(0.01, min(2.0, sleep_interval))
         await asyncio.sleep(sleep_interval)

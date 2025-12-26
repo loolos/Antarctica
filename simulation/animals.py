@@ -56,7 +56,10 @@ class Animal:
         
         self.x = new_x
         self.y = new_y
-        self.energy -= 0.05  # Movement consumes energy (reduced by 50%)
+        # Movement consumes energy (from config)
+        from .config import get_config
+        config = get_config()
+        self.energy -= config.ENERGY_CONSUMPTION_MOVE
         
         return hit_boundary  # Return if hit boundary
     
@@ -84,7 +87,10 @@ class Animal:
     def tick(self):
         """Update each tick"""
         self.age += 1
-        self.consume_energy(0.025)  # Basal metabolic rate (reduced by 50%)
+        # Consume energy each tick (basal metabolic rate, from config)
+        from .config import get_config
+        config = get_config()
+        self.consume_energy(config.ENERGY_CONSUMPTION_TICK)
 
 
 @dataclass
