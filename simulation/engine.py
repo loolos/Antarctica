@@ -18,6 +18,7 @@ from .world import WorldState
 from .animals import Penguin, Seal, Fish, Animal
 from .environment import Environment
 from .config import get_config
+from .spatial import SpatialGrid
 
 
 class SimulationEngine:
@@ -65,6 +66,12 @@ class SimulationEngine:
             height = config.WORLD_HEIGHT
         self.world = WorldState()
         self.world.environment = Environment(width=width, height=height)
+        
+        # Initialize spatial grid for efficient neighbor queries
+        # Cell size of 100 pixels balances precision and performance
+        # This means we check ~9 cells (3x3) for most queries
+        self.spatial_grid = SpatialGrid(width, height, cell_size=100.0)
+        
         self._initialize_world()
     
     def _initialize_world(self):
@@ -105,6 +112,8 @@ class SimulationEngine:
             penguin.hunting_cooldown = 0
             penguin.flee_cooldown = 0
             self.world.penguins.append(penguin)
+            # Add to spatial grid
+            self.spatial_grid.add(penguin)
         
         # Create initial seals with random positions and ages
         for i in range(config.INITIAL_SEALS):
@@ -137,19 +146,22 @@ class SimulationEngine:
             seal.hunting_cooldown = 0
             seal.flee_cooldown = 0
             self.world.seals.append(seal)
+            # Add to spatial grid
+            self.spatial_grid.add(seal)
         
         # Create initial fish (in the sea, not on ice floes)
         for i in range(config.INITIAL_FISH):
             # Find a position in the sea (not on any ice floe)
             x, y = self._find_sea_position()
-            self.world.fish.append(
-                Fish(
-                    id=f"fish_{i}",
-                    x=x,
-                    y=y,
-                    energy=random.uniform(20, 40),
-                )
+            fish = Fish(
+                id=f"fish_{i}",
+                x=x,
+                y=y,
+                energy=random.uniform(20, 40),
             )
+            self.world.fish.append(fish)
+            # Add to spatial grid
+            self.spatial_grid.add(fish)
     
     def tick(self):
         """
@@ -223,14 +235,15 @@ class SimulationEngine:
             if random.random() < 0.1: # 10% chance per tick to spawn a fish if low
                 # Find a position in the sea (not on any ice floe)
                 x, y = self._find_sea_position()
-                self.world.fish.append(
-                    Fish(
-                        id=f"fish_spawn_{self.world.tick}_{random.randint(100,999)}",
-                        x=x,
-                        y=y,
-                        energy=random.uniform(20, 40)
-                    )
+                new_fish = Fish(
+                    id=f"fish_spawn_{self.world.tick}_{random.randint(100,999)}",
+                    x=x,
+                    y=y,
+                    energy=random.uniform(20, 40)
                 )
+                self.world.fish.append(new_fish)
+                # Add to spatial grid
+                self.spatial_grid.add(new_fish)
     
     def _update_animals(self):
         """Update all animals' states"""
@@ -926,8 +939,20 @@ class SimulationEngine:
                 
         Note:
             Only considers alive animals. Dead animals are automatically
-            skipped in the search.
+            skipped in the search. Uses spatial grid for optimization when
+            max_distance is specified.
         """
+        # Use spatial grid optimization if max_distance is limited
+        if max_distance < float('inf') and targets:
+            return self.spatial_grid.find_nearest(
+                animal.x,
+                animal.y,
+                targets,
+                max_distance=max_distance,
+                exclude=animal
+            )
+        
+        # Fallback to linear search for unlimited distance
         nearest = None
         min_dist = max_distance
         
@@ -957,6 +982,8 @@ class SimulationEngine:
                     config = get_config()
                     # Seals get more energy from eating penguins than fish
                     seal.gain_energy(config.SEAL_ENERGY_RECOVERY_FISH * 2)
+                    # Remove from spatial grid before removing from world
+                    self.spatial_grid.remove(penguin)
                     self.world.penguins.remove(penguin)
                     # Set hunting cooldown (10 seconds at 5 ticks/sec)
                     config = get_config()
@@ -986,6 +1013,8 @@ class SimulationEngine:
                     # Predation successful
                     config = get_config()
                     seal.gain_energy(config.SEAL_ENERGY_RECOVERY_FISH)
+                    # Remove from spatial grid before removing from world
+                    self.spatial_grid.remove(fish)
                     self.world.fish.remove(fish)
                     # Set hunting cooldown (10 seconds at 5 ticks/sec)
                     config = get_config()
@@ -1015,6 +1044,8 @@ class SimulationEngine:
                     # Predation successful
                     config = get_config()
                     penguin.gain_energy(config.PENGUIN_ENERGY_RECOVERY_FISH)
+                    # Remove from spatial grid before removing from world
+                    self.spatial_grid.remove(fish)
                     self.world.fish.remove(fish)
                     # Set hunting cooldown (10 seconds at 5 ticks/sec)
                     penguin.hunting_cooldown = config.HUNTING_COOLDOWN_TICKS
@@ -1045,6 +1076,8 @@ class SimulationEngine:
                     p2.breeding_cooldown = p2.max_breeding_cooldown
                     p2.consume_energy(30)
                     self.world.penguins.append(baby)
+                    # Add to spatial grid
+                    self.spatial_grid.add(baby)
         
         # Seals breed (on land)
         breeding_seals = [s for s in self.world.seals if s.can_breed() and s.state == "land"]
@@ -1057,6 +1090,8 @@ class SimulationEngine:
                     s2.breeding_cooldown = s2.max_breeding_cooldown
                     s2.consume_energy(50)
                     self.world.seals.append(baby)
+                    # Add to spatial grid
+                    self.spatial_grid.add(baby)
         
         # Fish breed (in the sea)
         breeding_fish = [f for f in self.world.fish if f.is_alive() and f.energy > 30]
@@ -1086,6 +1121,8 @@ class SimulationEngine:
                     f1.consume_energy(10)
                     f2.consume_energy(10)
                     self.world.fish.append(baby)
+                    # Add to spatial grid
+                    self.spatial_grid.add(baby)
     
     def _remove_dead_animals(self):
         """Remove dead animals"""
