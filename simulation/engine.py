@@ -194,13 +194,16 @@ class SimulationEngine:
         target = None
         
         # Priorities:
-        # 1. Breeding/Resting (if needed and not on land)
+        # 1. Breeding/Resting/Social (if needed and not on land)
         needs_land = False
         if isinstance(animal, (Penguin, Seal)):
+            energy_percent = animal.energy / animal.max_energy
             if animal.breeding_cooldown == 0 and animal.energy > animal.max_energy * 0.8:
                 needs_land = True # Go to land to breed
             elif animal.energy < animal.max_energy * 0.3:
                 needs_land = True # Go to land to rest
+            elif energy_percent > 0.9:
+                needs_land = True # Go to land for socializing when energy > 90%
         
         if needs_land and not is_on_land:
             # Find nearest ice floe center
@@ -311,11 +314,11 @@ class SimulationEngine:
         
         # 1.5. Update behavior state based on energy
         # Enter searching mode when energy drops below 60%
-        # But not if in hunting cooldown (recently ate)
+        # But not if in hunting cooldown (recently ate) or energy > 90% (socializing)
         if isinstance(animal, (Penguin, Seal)):
             energy_percent = animal.energy / animal.max_energy
-            # Only change to searching if not fleeing, targeting, or in hunting cooldown
-            if energy_percent < 0.6 and animal.behavior_state not in ["fleeing", "targeting"] and animal.hunting_cooldown == 0:
+            # Only change to searching if not fleeing, targeting, in hunting cooldown, or energy > 90%
+            if energy_percent < 0.6 and energy_percent <= 0.9 and animal.behavior_state not in ["fleeing", "targeting"] and animal.hunting_cooldown == 0:
                 if animal.behavior_state != "searching":
                     animal.behavior_state = "searching"  # 搜寻状态
                     # Initialize searching direction when entering searching mode
@@ -323,6 +326,11 @@ class SimulationEngine:
                     animal.hunt_direction_ticks = random.randint(15, 40)
             elif energy_percent >= 0.6 and animal.behavior_state == "searching":
                 animal.behavior_state = "idle"
+                animal.hunt_direction_ticks = 0
+            # If energy > 90%, exit hunting states and go to idle (will go to land for socializing)
+            elif energy_percent > 0.9 and animal.behavior_state in ["searching", "targeting"]:
+                animal.behavior_state = "idle"
+                animal.target_id = ""  # Clear target if targeting
                 animal.hunt_direction_ticks = 0
         
         # 2. Safety (Avoid Predators) - High Priority override
@@ -338,7 +346,7 @@ class SimulationEngine:
                 perception_range = 150  # Normal perception in sea
             nearest_predator = self._find_nearest(animal, predators, max_distance=perception_range)
             
-            if nearest_predator:
+            if nearest_predator and animal.behavior_state != "fleeing":
                 # Flee! Change to fleeing state (最高优先级: 逃跑 > 锁定 > 分散 > 捕食)
                 animal.behavior_state = "fleeing"
                 # Set flee cooldown to 15 ticks (3 seconds at 5 ticks/sec)
@@ -351,128 +359,73 @@ class SimulationEngine:
                 
                 # Add random variation to fleeing direction (±45 degrees = ±π/4)
                 angle_variation = random.uniform(-math.pi / 4, math.pi / 4)
-                flee_angle = base_flee_angle + angle_variation
-                
-                # Calculate fleeing direction vector with variation
-                flee_dx = math.cos(flee_angle)
-                flee_dy = math.sin(flee_angle)
+                flee_angle = (base_flee_angle + angle_variation) % (2 * math.pi)
                 
                 # Constrain direction to avoid hitting boundaries
-                flee_dx, flee_dy = self._constrain_direction_near_edge(animal, flee_dx, flee_dy)
-                # Recalculate angle after constraint
-                flee_angle = math.atan2(flee_dy, flee_dx)
+                temp_dx = math.cos(flee_angle) * 100  # Use a large vector for direction calculation
+                temp_dy = math.sin(flee_angle) * 100
+                constrained_dx, constrained_dy = self._constrain_direction_near_edge(animal, temp_dx, temp_dy)
+                flee_angle = math.atan2(constrained_dy, constrained_dx)
                 
-                # Check for ice floes in the fleeing direction (前方不远处)
-                # Look for ice floes within 200 units in the fleeing direction
-                ice_floe_found = None
-                min_floe_distance = float('inf')
-                
-                for floe in self.world.environment.ice_floes:
-                    # Calculate distance to floe
-                    floe_dx = floe['x'] - animal.x
-                    floe_dy = floe['y'] - animal.y
-                    floe_distance = math.sqrt(floe_dx**2 + floe_dy**2)
-                    
-                    # Check if floe is in front (within 60 degrees of fleeing direction)
-                    if floe_distance > 0 and floe_distance < 200:  # Within 200 units
-                        floe_angle = math.atan2(floe_dy, floe_dx)
-                        angle_diff = abs((floe_angle - flee_angle + math.pi) % (2 * math.pi) - math.pi)
-                        
-                        # If floe is in front (within 60 degrees) and closer than previous
-                        if angle_diff < math.pi / 3 and floe_distance < min_floe_distance:
-                            ice_floe_found = floe
-                            min_floe_distance = floe_distance
-                
-                # If found ice floe in front, flee towards it (冲向浮冰)
-                if ice_floe_found:
-                    dx = ice_floe_found['x'] - animal.x
-                    dy = ice_floe_found['y'] - animal.y
-                    # Constrain direction towards floe to avoid boundaries
-                    dx, dy = self._constrain_direction_near_edge(animal, dx, dy)
-                    animal.flee_edge_direction = math.atan2(dy, dx)
-                    # Set timer to continue towards floe
-                    animal.hunt_direction_ticks = random.randint(15, 30)
-                else:
-                    # No ice floe found, use varied fleeing direction
-                    animal.flee_edge_direction = flee_angle
-                    animal.hunt_direction_ticks = 0
+                # Store the fleeing direction (fixed for 3 seconds, won't change)
+                animal.flee_edge_direction = flee_angle
                 
                 target = nearest_predator # Just to mark as "busy" so we don't hunt while fleeing
-            elif animal.behavior_state == "fleeing":
-                # Continue fleeing even if predator not visible (maintain fleeing state briefly)
-                # Check if we should look for ice floes while fleeing
-                if animal.hunt_direction_ticks > 0:
-                    # Continue in current direction (towards floe or along edge)
-                    animal.hunt_direction_ticks -= 1
-                    dx = math.cos(animal.flee_edge_direction) * 30
-                    dy = math.sin(animal.flee_edge_direction) * 30
+            
+            # If already in fleeing state, continue fleeing in fixed direction for 3 seconds
+            if animal.behavior_state == "fleeing":
+                if animal.flee_cooldown > 0:
+                    # Still fleeing: continue in fixed direction, don't change direction or stop
+                    animal.flee_cooldown -= 1
+                    # Move in the fixed fleeing direction (30-50 units per step)
+                    # Direction was already constrained when fleeing started, so use it directly
+                    flee_distance = 30 + random.uniform(0, 20)
+                    dx = math.cos(animal.flee_edge_direction) * flee_distance
+                    dy = math.sin(animal.flee_edge_direction) * flee_distance
+                    # Re-apply boundary constraint to ensure we don't hit boundaries
+                    # This adjusts the movement vector but keeps the stored direction fixed
+                    dx, dy = self._constrain_direction_near_edge(animal, dx, dy)
+                    # Note: We don't update flee_edge_direction here to keep it fixed for 3 seconds
                 else:
-                    # Check for nearby ice floes to escape to
-                    ice_floe_found = None
-                    min_floe_distance = float('inf')
-                    
-                    for floe in self.world.environment.ice_floes:
-                        floe_dx = floe['x'] - animal.x
-                        floe_dy = floe['y'] - animal.y
-                        floe_distance = math.sqrt(floe_dx**2 + floe_dy**2)
-                        
-                        # Look for nearby ice floes (within 150 units)
-                        if floe_distance > 0 and floe_distance < 150:
-                            if floe_distance < min_floe_distance:
-                                ice_floe_found = floe
-                                min_floe_distance = floe_distance
-                    
-                    if ice_floe_found:
-                        # Head towards ice floe
-                        dx = ice_floe_found['x'] - animal.x
-                        dy = ice_floe_found['y'] - animal.y
-                        animal.flee_edge_direction = math.atan2(dy, dx)
-                        animal.hunt_direction_ticks = random.randint(15, 30)
+                    # 3 seconds passed, exit fleeing state
+                    energy_percent = animal.energy / animal.max_energy
+                    if energy_percent < 0.6:
+                        animal.behavior_state = "searching"
+                        # Initialize new searching direction
+                        animal.hunt_direction_angle = random.uniform(0, 2 * math.pi)
+                        animal.hunt_direction_ticks = random.randint(15, 40)
                     else:
-                        # No ice floe found, continue fleeing or exit fleeing state
-                        # Only exit fleeing state if cooldown is 0 (no predator seen for 3 seconds)
-                        if animal.flee_cooldown == 0:
-                            # No longer see predator and cooldown expired, can resume normal behavior
-                            energy_percent = animal.energy / animal.max_energy
-                            if energy_percent < 0.6:
-                                animal.behavior_state = "searching"  # 返回搜寻状态
-                                # Initialize new searching direction
-                                animal.hunt_direction_angle = random.uniform(0, 2 * math.pi)
-                                animal.hunt_direction_ticks = random.randint(15, 40)
-                            else:
-                                animal.behavior_state = "idle"
-                                animal.hunt_direction_ticks = 0
-                        else:
-                            # Still in flee cooldown, continue fleeing in current direction
-                            # Continue in the fleeing direction
-                            dx = math.cos(animal.flee_edge_direction) * 30
-                            dy = math.sin(animal.flee_edge_direction) * 30
+                        animal.behavior_state = "idle"
+                    animal.hunt_direction_ticks = 0
         
-        # 3. Searching Behavior (搜寻状态) - when energy < 60%
+        # 3. Searching Behavior (搜寻状态) - when energy < 60% and <= 90%
         # Animals move in a direction for 3-8 seconds (15-40 ticks at 5 ticks/sec), then change direction
         # If they find food or hit boundary, change behavior
-        # But not if in hunting cooldown (recently ate)
+        # But not if in hunting cooldown (recently ate) or energy > 90% (socializing)
         if not target and isinstance(animal, (Penguin, Seal)) and animal.behavior_state == "searching" and animal.hunting_cooldown == 0:
-            # Check if we need to set a new searching direction
-            if animal.hunt_direction_ticks <= 0:
-                # Set new random direction (3-8 seconds = 15-40 ticks at 5 ticks/sec)
-                animal.hunt_direction_ticks = random.randint(15, 40)
-                animal.hunt_direction_angle = random.uniform(0, 2 * math.pi)
-            
-            # Decrease direction timer
-            animal.hunt_direction_ticks -= 1
-            
-            # Move in the searching direction
-            search_distance = 30 + random.uniform(0, 20)  # 30-50 units per step
-            dx = math.cos(animal.hunt_direction_angle) * search_distance
-            dy = math.sin(animal.hunt_direction_angle) * search_distance
-            
-            # Check for prey while searching
-            prey_type = None
-            if isinstance(animal, Penguin) and animal.state == "sea":
-                prey_type = Fish
-            elif isinstance(animal, Seal):
-                prey_type = (Penguin, Fish) if animal.state == "sea" else Penguin
+            energy_percent = animal.energy / animal.max_energy
+            # Don't search if energy > 90% (should be socializing on land instead)
+            if energy_percent <= 0.9:
+                # Check if we need to set a new searching direction
+                if animal.hunt_direction_ticks <= 0:
+                    # Set new random direction (3-8 seconds = 15-40 ticks at 5 ticks/sec)
+                    animal.hunt_direction_ticks = random.randint(15, 40)
+                    animal.hunt_direction_angle = random.uniform(0, 2 * math.pi)
+                
+                # Decrease direction timer
+                animal.hunt_direction_ticks -= 1
+                
+                # Move in the searching direction
+                search_distance = 30 + random.uniform(0, 20)  # 30-50 units per step
+                dx = math.cos(animal.hunt_direction_angle) * search_distance
+                dy = math.sin(animal.hunt_direction_angle) * search_distance
+                
+                # Check for prey while searching
+                prey_type = None
+                if isinstance(animal, Penguin) and animal.state == "sea":
+                    prey_type = Fish
+                elif isinstance(animal, Seal):
+                    prey_type = (Penguin, Fish) if animal.state == "sea" else Penguin
             
             if prey_type:
                 potential_prey = []
@@ -582,41 +535,44 @@ class SimulationEngine:
         
         # 3b. Regular Hunting (when not in searching/targeting mode, but still looking for food)
         # Penguins and Seals actively hunt even when not very hungry to explore and find food
-        # But not if in hunting cooldown (recently ate)
+        # But not if in hunting cooldown (recently ate) or energy > 90% (socializing)
         if not target and isinstance(animal, (Penguin, Seal)) and animal.behavior_state not in ["searching", "targeting"] and animal.hunting_cooldown == 0:
-            prey_type = None
-            hunting_threshold = 1.0  # Always hunt (no energy threshold)
-            
-            if isinstance(animal, Penguin) and animal.state == "sea":
-                prey_type = Fish
-            elif isinstance(animal, Seal):
-                # Seals hunt Penguins everywhere (prioritized) or Fish in sea
-                prey_type = (Penguin, Fish) if animal.state == "sea" else Penguin
-            
-            if prey_type and animal.energy < animal.max_energy * hunting_threshold:
-                # Find prey with increased search range for better exploration
-                potential_prey = []
-                if isinstance(prey_type, tuple):
-                    for t in prey_type:
-                        if t == Penguin: potential_prey.extend(self.world.penguins)
-                        if t == Fish: potential_prey.extend(self.world.fish)
-                elif prey_type == Penguin:
-                    potential_prey = self.world.penguins
-                elif prey_type == Fish:
-                    potential_prey = self.world.fish
+            energy_percent = animal.energy / animal.max_energy
+            # Don't hunt if energy > 90% (should be socializing on land instead)
+            if energy_percent <= 0.9:
+                prey_type = None
+                hunting_threshold = 1.0  # Always hunt (no energy threshold)
                 
-                # Filter valid prey
-                valid_prey = [
-                    p for p in potential_prey 
-                    if p.is_alive() and p != animal and 
-                    (isinstance(p, Fish) or p.state == animal.state) # Hunt in same medium
-                ]
+                if isinstance(animal, Penguin) and animal.state == "sea":
+                    prey_type = Fish
+                elif isinstance(animal, Seal):
+                    # Seals hunt Penguins everywhere (prioritized) or Fish in sea
+                    prey_type = (Penguin, Fish) if animal.state == "sea" else Penguin
                 
-                # Increased search range for better exploration (600 instead of 300)
-                target = self._find_nearest(animal, valid_prey, max_distance=600)
-                if target:
-                    dx = target.x - animal.x
-                    dy = target.y - animal.y
+                if prey_type and animal.energy < animal.max_energy * hunting_threshold:
+                    # Find prey with increased search range for better exploration
+                    potential_prey = []
+                    if isinstance(prey_type, tuple):
+                        for t in prey_type:
+                            if t == Penguin: potential_prey.extend(self.world.penguins)
+                            if t == Fish: potential_prey.extend(self.world.fish)
+                    elif prey_type == Penguin:
+                        potential_prey = self.world.penguins
+                    elif prey_type == Fish:
+                        potential_prey = self.world.fish
+                    
+                    # Filter valid prey
+                    valid_prey = [
+                        p for p in potential_prey 
+                        if p.is_alive() and p != animal and 
+                        (isinstance(p, Fish) or p.state == animal.state) # Hunt in same medium
+                    ]
+                    
+                    # Increased search range for better exploration (600 instead of 300)
+                    target = self._find_nearest(animal, valid_prey, max_distance=600)
+                    if target:
+                        dx = target.x - animal.x
+                        dy = target.y - animal.y
         
         # 4. Active Exploration (if no other drive, for Penguins and Seals)
         # Instead of small random movements, make them explore larger areas
@@ -710,60 +666,12 @@ class SimulationEngine:
         # Apply movement and check for boundary collision
         hit_boundary = animal.move(dx, dy, self.world.environment.width, self.world.environment.height)
         
-        # Handle boundary collisions based on behavior state
+        # Handle boundary collisions - when fleeing, direction is already fixed for 3 seconds
+        # No need to change direction when hitting boundary during fleeing (direction won't change)
         if hit_boundary and isinstance(animal, (Penguin, Seal)):
             if animal.behavior_state == "fleeing":
-                # When fleeing and hit boundary, move along the edge
-                # Determine which edge was hit and choose direction along it
-                width = self.world.environment.width
-                height = self.world.environment.height
-                edge_margin = 5  # Consider near edge if within this distance
-                
-                # Check which edge(s) we're near
-                near_left = animal.x < edge_margin
-                near_right = animal.x > width - edge_margin
-                near_top = animal.y < edge_margin
-                near_bottom = animal.y > height - edge_margin
-                
-                # Choose direction along the edge
-                if near_left or near_right:
-                    # On vertical edge, move along vertically (up or down)
-                    if near_top:
-                        # Top-left or top-right corner, move down
-                        animal.flee_edge_direction = math.pi / 2  # Down
-                    elif near_bottom:
-                        # Bottom-left or bottom-right corner, move up
-                        animal.flee_edge_direction = -math.pi / 2  # Up
-                    else:
-                        # Middle of vertical edge, random up or down
-                        animal.flee_edge_direction = random.choice([math.pi / 2, -math.pi / 2])
-                elif near_top or near_bottom:
-                    # On horizontal edge, move along horizontally (left or right)
-                    if near_left:
-                        # Top-left or bottom-left corner, move right
-                        animal.flee_edge_direction = 0  # Right
-                    elif near_right:
-                        # Top-right or bottom-right corner, move left
-                        animal.flee_edge_direction = math.pi  # Left
-                    else:
-                        # Middle of horizontal edge, random left or right
-                        animal.flee_edge_direction = random.choice([0, math.pi])
-                else:
-                    # Near corner, pick a direction along one of the edges
-                    if near_left and near_top:
-                        animal.flee_edge_direction = random.choice([0, math.pi / 2])  # Right or Down
-                    elif near_left and near_bottom:
-                        animal.flee_edge_direction = random.choice([0, -math.pi / 2])  # Right or Up
-                    elif near_right and near_top:
-                        animal.flee_edge_direction = random.choice([math.pi, math.pi / 2])  # Left or Down
-                    elif near_right and near_bottom:
-                        animal.flee_edge_direction = random.choice([math.pi, -math.pi / 2])  # Left or Up
-                    else:
-                        # Default: random direction
-                        animal.flee_edge_direction = random.uniform(0, 2 * math.pi)
-                
-                # Set timer to continue along edge
-                animal.hunt_direction_ticks = random.randint(20, 40)
+                # Direction is fixed, just continue (boundary constraint already applied in movement)
+                pass
                 
             elif animal.behavior_state == "searching":
                 # If hit boundary during searching, reverse direction

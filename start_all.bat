@@ -28,42 +28,25 @@ for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":%FRONTEND_PORT%" ^| findstr
     taskkill /F /PID %%a >nul 2>&1
 )
 
-REM Start backend in background
+REM Start backend using start_backend.bat (with AUTO_CLOSE=0 so it runs until we kill it)
 echo.
 echo [1/3] Starting backend server...
-cd backend
-if not exist "venv\Scripts\activate.bat" (
-    echo Error: Virtual environment not found. Please create it first.
-    pause
-    exit /b 1
-)
-call venv\Scripts\activate.bat
-REM Start backend with AUTO_CLOSE=0 (we'll control it from here)
-start "Backend Server" cmd /c "set AUTO_CLOSE=0 && venv\Scripts\activate.bat && python main.py"
-cd ..
+set AUTO_CLOSE=0
+start "Backend Server" cmd /c "cd /d %~dp0 && set AUTO_CLOSE=0 && scripts\start_backend.bat"
 
 REM Wait for backend to start
-echo Waiting for backend to start (5 seconds)...
-timeout /t 5 /nobreak >nul
+echo Waiting for backend to start (3 seconds)...
+timeout /t 3 /nobreak >nul
 
-REM Start frontend in background
+REM Start frontend using start_frontend.bat (with AUTO_CLOSE=0 so it runs until we kill it)
 echo [2/3] Starting frontend server...
-cd frontend
-if not exist "node_modules" (
-    echo Error: node_modules not found. Please run 'npm install' first.
-    pause
-    exit /b 1
-)
-REM Prevent browser auto-open from npm start and set AUTO_CLOSE=0
-set BROWSER=none
-start "Frontend Server" cmd /c "set BROWSER=none && set AUTO_CLOSE=0 && npm start"
-cd ..
+start "Frontend Server" cmd /c "cd /d %~dp0 && set AUTO_CLOSE=0 && set BROWSER=none && scripts\start_frontend.bat"
 
-REM Wait for frontend to start (React dev server takes longer)
-echo Waiting for frontend to start (15 seconds)...
-timeout /t 15 /nobreak >nul
+REM Wait for frontend to start
+echo Waiting for frontend to start (3 seconds)...
+timeout /t 3 /nobreak >nul
 
-REM Open browser manually
+REM Open browser manually (only once)
 echo [3/3] Opening browser...
 start http://localhost:%FRONTEND_PORT%
 
@@ -85,27 +68,40 @@ timeout /t %AUTO_CLOSE% /nobreak
 REM Close services
 echo.
 echo Closing services...
+
+REM Close backend
 echo Closing backend...
+REM Method 1: Kill by port
 for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":%BACKEND_PORT%" ^| findstr "LISTENING"') do (
-    echo   Killing backend process (PID: %%a)
+    echo   Killing backend process on port %BACKEND_PORT% (PID: %%a)
     taskkill /F /PID %%a >nul 2>&1
 )
-REM Also kill Python processes running main.py
+REM Method 2: Kill Python processes running main.py
 for /f "tokens=2" %%a in ('tasklist /FI "IMAGENAME eq python.exe" /FO CSV ^| findstr /I "python.exe"') do (
     wmic process where "CommandLine like '%%main.py%%' AND ProcessId=%%a" delete >nul 2>&1
 )
-
-echo Closing frontend...
-for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":%FRONTEND_PORT%" ^| findstr "LISTENING"') do (
-    echo   Killing frontend process (PID: %%a)
+REM Method 3: Kill by window title (Backend Server)
+for /f "tokens=2" %%a in ('tasklist /FI "WINDOWTITLE eq Backend Server*" /FO CSV ^| findstr /I "cmd.exe"') do (
     taskkill /F /PID %%a >nul 2>&1
 )
-REM Also kill all node processes (frontend)
+timeout /t 1 /nobreak >nul
+
+REM Close frontend
+echo Closing frontend...
+REM Method 1: Kill by port
+for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":%FRONTEND_PORT%" ^| findstr "LISTENING"') do (
+    echo   Killing frontend process on port %FRONTEND_PORT% (PID: %%a)
+    taskkill /F /PID %%a >nul 2>&1
+)
+REM Method 2: Kill all node processes (frontend)
 taskkill /F /IM node.exe >nul 2>&1
+REM Method 3: Kill by window title (Frontend Server)
+for /f "tokens=2" %%a in ('tasklist /FI "WINDOWTITLE eq Frontend Server*" /FO CSV ^| findstr /I "cmd.exe"') do (
+    taskkill /F /PID %%a >nul 2>&1
+)
+timeout /t 1 /nobreak >nul
 
 echo.
 echo ========================================
 echo Services closed.
 echo ========================================
-pause
-

@@ -88,5 +88,3 @@ if not %AUTO_CLOSE% EQU 0 (
     REM Run server in foreground (user must stop manually)
     py main.py
 )
-
-pause
