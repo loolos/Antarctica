@@ -1,19 +1,68 @@
 """
-Simulation engine
+Simulation engine - Core simulation logic for Antarctic ecosystem
+
+This module contains the SimulationEngine class, which manages the entire
+simulation world including animals, environment, and all interactions.
+
+The engine operates on a tick-based system where each tick represents one
+time step in the simulation. During each tick:
+- Animals update their behavior and move
+- Environment updates (temperature, ice coverage)
+- Predation, breeding, and spawning are handled
+- Dead animals are removed
 """
 import random
 import math
-from typing import List
+from typing import List, Optional, Tuple
 from .world import WorldState
-from .animals import Penguin, Seal, Fish
+from .animals import Penguin, Seal, Fish, Animal
 from .environment import Environment
 from .config import get_config
 
 
 class SimulationEngine:
-    """Simulation engine core"""
+    """
+    Core simulation engine for Antarctic ecosystem simulation.
     
-    def __init__(self, width: int = 800, height: int = 600):
+    The SimulationEngine manages the entire simulation world, including:
+    - Animal populations (penguins, seals, fish)
+    - Environment state (temperature, ice coverage, seasons)
+    - Animal behaviors (movement, hunting, fleeing, breeding)
+    - Interactions (predation, breeding, spawning)
+    
+    The engine uses a tick-based system where each tick represents one
+    time step. The simulation runs at 5 ticks per second by default.
+    
+    Attributes:
+        world (WorldState): The current state of the simulation world
+        
+    Example:
+        ```python
+        engine = SimulationEngine(width=800, height=600)
+        engine.step(100)  # Advance 100 ticks
+        state = engine.get_state()
+        print(f"Tick: {state.tick}, Penguins: {len(state.penguins)}")
+        ```
+    """
+    
+    def __init__(self, width: Optional[int] = None, height: Optional[int] = None):
+        """
+        Initialize the simulation engine.
+        
+        Args:
+            width: World width in pixels (default: from config)
+            height: World height in pixels (default: from config)
+            
+        Note:
+            If width/height are not provided, values from SimulationConfig
+            will be used (default: 800x600).
+        """
+        config = get_config()
+        # Use config defaults if not provided
+        if width is None:
+            width = config.WORLD_WIDTH
+        if height is None:
+            height = config.WORLD_HEIGHT
         self.world = WorldState()
         self.world.environment = Environment(width=width, height=height)
         self._initialize_world()
@@ -103,7 +152,21 @@ class SimulationEngine:
             )
     
     def tick(self):
-        """Execute one time step"""
+        """
+        Execute one simulation time step (tick).
+        
+        This method runs the complete simulation logic for one time step:
+        1. Increment simulation tick counter
+        2. Update environment (temperature, ice coverage, seasons)
+        3. Update all animals (movement, behavior, energy consumption)
+        4. Handle predation (animals eating other animals)
+        5. Handle breeding (animals reproducing)
+        6. Handle spontaneous generation (fish spawning)
+        7. Remove dead animals
+        
+        This is the core simulation loop method. It should be called
+        repeatedly to advance the simulation.
+        """
         self.world.tick += 1
         
         # Update environment
@@ -124,8 +187,24 @@ class SimulationEngine:
         # Remove dead animals
         self._remove_dead_animals()
     
-    def _find_sea_position(self, max_attempts: int = 50):
-        """Find a random position in the sea (not on any ice floe)"""
+    def _find_sea_position(self, max_attempts: int = 50) -> Tuple[float, float]:
+        """
+        Find a random position in the sea (not on any ice floe).
+        
+        Attempts to find a valid sea position by randomly sampling positions
+        and checking if they are not on land. This is used for spawning fish
+        and initializing animals that should start in the sea.
+        
+        Args:
+            max_attempts: Maximum number of random attempts before fallback
+            
+        Returns:
+            Tuple[float, float]: (x, y) coordinates of a sea position
+            
+        Note:
+            If no valid sea position is found after max_attempts, returns
+            a fallback position in the right half of the map.
+        """
         for _ in range(max_attempts):
             x = random.uniform(0, self.world.environment.width)
             y = random.uniform(0, self.world.environment.height)
@@ -700,18 +779,38 @@ class SimulationEngine:
                 config = get_config()
                 animal.hunt_direction_ticks = random.randint(config.HUNTING_DIRECTION_TICKS_MIN, config.HUNTING_DIRECTION_TICKS_MAX)
     
-    def _constrain_direction_near_edge(self, animal, dx: float, dy: float):
-        """Constrain movement direction when near screen edges
+    def _constrain_direction_near_edge(
+        self, 
+        animal: Animal, 
+        dx: float, 
+        dy: float
+    ) -> Tuple[float, float]:
+        """
+        Constrain movement direction when animal is near screen edges.
         
-        If animal is near an edge, limit movement direction to 180 degrees facing inward.
-        For example, if near bottom edge, direction must be between left-to-up-to-right (180°).
+        When an animal is near a map boundary, this method adjusts the
+        movement direction to prevent the animal from moving off-screen.
+        The direction is constrained to a 180-degree arc facing inward
+        from the edge.
+        
+        For example:
+        - Near bottom edge: direction must be between left-to-up-to-right (180°)
+        - Near top edge: direction must be between left-to-down-to-right (180°)
+        - Near left/right edges: similar constraints apply
         
         Args:
-            animal: The animal to check
-            dx, dy: Movement direction vector
+            animal: The animal whose movement is being constrained
+            dx: X component of movement direction vector
+            dy: Y component of movement direction vector
             
         Returns:
-            Constrained dx, dy
+            Tuple[float, float]: Constrained (dx, dy) vector that keeps
+                the animal within map boundaries
+                
+        Note:
+            The edge margin is configurable via SimulationConfig.EDGE_MARGIN.
+            The method preserves the original movement distance while
+            adjusting only the direction.
         """
         config = get_config()
         width = self.world.environment.width
@@ -804,8 +903,31 @@ class SimulationEngine:
         
         return dx, dy
     
-    def _find_nearest(self, animal, targets: List, max_distance: float = float('inf')):
-        """Find nearest target"""
+    def _find_nearest(
+        self, 
+        animal: Animal, 
+        targets: List[Animal], 
+        max_distance: float = float('inf')
+    ) -> Optional[Animal]:
+        """
+        Find the nearest target animal within a specified distance.
+        
+        Searches through a list of target animals and returns the one
+        closest to the given animal, if it's within max_distance.
+        
+        Args:
+            animal: The animal to find nearest target for
+            targets: List of potential target animals
+            max_distance: Maximum distance to search (default: unlimited)
+            
+        Returns:
+            Optional[Animal]: The nearest target within range, or None if
+                no target is found within max_distance
+                
+        Note:
+            Only considers alive animals. Dead animals are automatically
+            skipped in the search.
+        """
         nearest = None
         min_dist = max_distance
         
@@ -972,11 +1094,38 @@ class SimulationEngine:
         self.world.fish = [f for f in self.world.fish if f.is_alive()]
     
     def get_state(self) -> WorldState:
-        """Get current world state"""
+        """
+        Get the current world state.
+        
+        Returns:
+            WorldState: The complete current state of the simulation,
+                including all animals, environment, and tick count.
+                
+        Note:
+            This returns a reference to the internal world state.
+            Modifying the returned object will affect the simulation.
+            For serialization, use `state.to_dict()` instead.
+        """
         return self.world
     
     def step(self, n: int = 1):
-        """Advance N steps"""
+        """
+        Advance the simulation by N steps.
+        
+        Executes the tick() method N times, effectively advancing
+        the simulation by N time steps.
+        
+        Args:
+            n: Number of steps to advance (default: 1)
+            
+        Example:
+            ```python
+            engine = SimulationEngine()
+            engine.step(100)  # Advance 100 ticks
+            state = engine.get_state()
+            print(f"Current tick: {state.tick}")  # Should be 100
+            ```
+        """
         for _ in range(n):
             self.tick()
 

@@ -13,10 +13,34 @@ from simulation.engine import SimulationEngine
 
 
 class SimulationService:
-    """Service class for managing simulation state"""
+    """
+    Service class for managing simulation state and operations.
+    
+    This service acts as a facade for the SimulationEngine, providing
+    a clean interface for the FastAPI backend. It manages:
+    - Simulation engine instance
+    - Running state (start/stop)
+    - Speed control
+    - WebSocket client connections
+    
+    The service uses dependency injection pattern, allowing easy
+    testing and multiple instances if needed.
+    
+    Attributes:
+        engine (SimulationEngine): The simulation engine instance
+        is_running (bool): Whether automatic simulation is running
+        speed (float): Speed multiplier (1.0 = normal, 5 ticks/sec)
+        websocket_clients (List[WebSocket]): Connected WebSocket clients
+    """
     
     def __init__(self, width: int = 800, height: int = 600):
-        """Initialize simulation service"""
+        """
+        Initialize simulation service.
+        
+        Args:
+            width: World width in pixels (default: 800)
+            height: World height in pixels (default: 600)
+        """
         self.engine = SimulationEngine(width=width, height=height)
         self.is_running = False
         self.speed = 1.0  # Speed multiplier (1.0 = normal, 5 ticks/sec)

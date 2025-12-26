@@ -44,22 +44,73 @@ def get_simulation_service() -> SimulationService:
     return _simulation_service
 
 
-@app.get("/")
+@app.get("/", tags=["Info"])
 async def root():
-    """Root path"""
+    """
+    Root endpoint - API information
+    
+    Returns basic information about the API including version.
+    
+    Returns:
+        dict: API information with message and version
+    """
     return {"message": "Antarctic Ecosystem Simulation API", "version": "1.0.0"}
 
 
-@app.get("/state")
+@app.get("/state", tags=["Simulation"])
 async def get_state(service: SimulationService = Depends(get_simulation_service)):
-    """Get current world state"""
+    """
+    Get current world state
+    
+    Retrieves the complete current state of the simulation world, including:
+    - All animals (penguins, seals, fish) with their positions, energy, age, and states
+    - Environment state (temperature, ice coverage, season, ice floes)
+    - Current simulation tick
+    
+    Returns:
+        dict: Complete world state as a dictionary
+        
+    Example:
+        ```json
+        {
+            "tick": 100,
+            "penguins": [...],
+            "seals": [...],
+            "fish": [...],
+            "environment": {...}
+        }
+        ```
+    """
     state = service.get_state()
     return state.to_dict()
 
 
-@app.post("/step")
-async def step(n: int = 1, service: SimulationService = Depends(get_simulation_service)):
-    """Advance simulation N steps"""
+@app.post("/step", tags=["Simulation"])
+async def step(
+    n: int = 1,
+    service: SimulationService = Depends(get_simulation_service)
+):
+    """
+    Advance simulation N steps
+    
+    Manually advances the simulation by the specified number of steps.
+    Each step executes one tick of the simulation, updating all animals,
+    environment, and handling interactions.
+    
+    Args:
+        n: Number of steps to advance (1-100, default: 1)
+        
+    Returns:
+        dict: Updated world state after advancing
+        
+    Raises:
+        400: If n is outside valid range (1-100)
+        
+    Example:
+        ```bash
+        POST /step?n=10
+        ```
+    """
     try:
         service.step(n)
         state = service.get_state()
@@ -71,36 +122,95 @@ async def step(n: int = 1, service: SimulationService = Depends(get_simulation_s
         )
 
 
-@app.post("/reset")
+@app.post("/reset", tags=["Simulation"])
 async def reset(service: SimulationService = Depends(get_simulation_service)):
-    """Reset simulation"""
+    """
+    Reset simulation to initial state
+    
+    Resets the entire simulation to its initial state, including:
+    - All animals reset to starting positions and states
+    - Environment reset to initial conditions
+    - Simulation tick reset to 0
+    - Automatic running stopped
+    
+    Returns:
+        dict: Success message
+        
+    Example:
+        ```bash
+        POST /reset
+        ```
+    """
     service.reset()
     return {"message": "Simulation reset"}
 
 
-@app.post("/start")
+@app.post("/start", tags=["Control"])
 async def start(service: SimulationService = Depends(get_simulation_service)):
-    """Start automatic running"""
+    """
+    Start automatic simulation
+    
+    Starts the automatic simulation loop. The simulation will run continuously
+    at the configured speed (default: 5 ticks per second) until stopped.
+    State updates are automatically broadcast to all connected WebSocket clients.
+    
+    Returns:
+        dict: Success message
+        
+    Note:
+        The simulation runs in the background. Use /stop to halt execution.
+    """
     service.start()
     return {"message": "Simulation started"}
 
 
-@app.post("/stop")
+@app.post("/stop", tags=["Control"])
 async def stop(service: SimulationService = Depends(get_simulation_service)):
-    """Stop automatic running"""
+    """
+    Stop automatic simulation
+    
+    Stops the automatic simulation loop. The simulation state is preserved
+    and can be resumed by calling /start again.
+    
+    Returns:
+        dict: Success message
+    """
     service.stop()
     return {"message": "Simulation stopped"}
 
 
-@app.post("/speed")
+@app.post("/speed", tags=["Control"])
 async def set_speed(
     request: SpeedRequest,
     service: SimulationService = Depends(get_simulation_service)
 ):
-    """Set simulation speed multiplier
+    """
+    Set simulation speed multiplier
+    
+    Adjusts the speed at which the simulation runs. The speed is a multiplier
+    that affects how fast the simulation advances.
     
     Args:
-        request: JSON body with speed field (0.1 to 10.0, where 1.0 = normal speed, 5 ticks/sec)
+        request: JSON body containing speed field
+            - speed (float): Speed multiplier (0.1 to 10.0)
+                - 0.1 = 10% speed (0.5 ticks/sec)
+                - 1.0 = normal speed (5 ticks/sec)
+                - 2.0 = 2x speed (10 ticks/sec)
+                - 10.0 = 10x speed (50 ticks/sec)
+    
+    Returns:
+        dict: Success message with new speed
+        
+    Raises:
+        400: If speed is outside valid range (0.1-10.0)
+        
+    Example:
+        ```json
+        POST /speed
+        {
+            "speed": 2.0
+        }
+        ```
     """
     try:
         service.set_speed(request.speed)
@@ -112,15 +222,60 @@ async def set_speed(
         )
 
 
-@app.get("/speed")
+@app.get("/speed", tags=["Control"])
 async def get_speed(service: SimulationService = Depends(get_simulation_service)):
-    """Get current simulation speed"""
+    """
+    Get current simulation speed
+    
+    Returns the current speed multiplier of the simulation.
+    
+    Returns:
+        dict: Current speed multiplier
+        
+    Example:
+        ```json
+        {
+            "speed": 1.0
+        }
+        ```
+    """
     return {"speed": service.get_speed()}
 
 
-@app.websocket("/ws")
+@app.websocket("/ws", tags=["WebSocket"])
 async def websocket_endpoint(websocket: WebSocket):
-    """WebSocket endpoint, push state updates in real-time"""
+    """
+    WebSocket endpoint for real-time state updates
+    
+    Establishes a WebSocket connection for receiving real-time simulation
+    state updates. When automatic simulation is running, state updates
+    are automatically pushed to all connected clients.
+    
+    **Connection Flow:**
+    1. Client connects to `/ws`
+    2. Server sends initial world state immediately
+    3. If simulation is running, server pushes updates automatically
+    4. Client can send commands:
+       - `"ping"`: Test connection (server responds with `"pong"`)
+       - `"step"`: Manually advance simulation by 1 step
+    
+    **State Update Format:**
+    State updates are sent as JSON objects matching the `/state` endpoint format.
+    
+    **Disconnection:**
+    Client is automatically removed from the broadcast list on disconnect.
+    
+    Example:
+        ```javascript
+        const ws = new WebSocket('ws://localhost:8000/ws');
+        ws.onmessage = (event) => {
+            const state = JSON.parse(event.data);
+            console.log('Tick:', state.tick);
+        };
+        ws.send('ping');  // Test connection
+        ws.send('step');  // Advance one step
+        ```
+    """
     await websocket.accept()
     service = get_simulation_service()
     service.add_websocket_client(websocket)
