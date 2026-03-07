@@ -49,8 +49,7 @@ The project follows a 3-layer architecture:
 - **Service facade pattern**:
   keeps API layer thin and simulation core reusable.
 
-## 5) Testing and quality signals
+## 5) Bug fix included in this update
 
-- Unit and integration tests exist under `tests/` for animals, environment, engine, and full-cycle behavior.
-- Recommended fast check: `python tests/test_quick.py`.
-- Full suite: `python -m unittest discover tests`.
+- Fixed animal lifecycle rule so `Animal.is_alive()` now considers both energy and max age.
+  This aligns runtime behavior with existing tests and expected simulation constraints.
