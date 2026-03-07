@@ -74,6 +74,15 @@ class TestAnimals(unittest.TestCase):
         penguin2 = Penguin(id="test2", x=100, y=100, energy=50, age=2000)
         self.assertFalse(penguin2.is_alive())  # 超过最大年龄
     
+    def test_animal_age_boundary(self):
+        """测试动物年龄边界"""
+        penguin = Penguin(id="edge", x=100, y=100, energy=50)
+        penguin.age = penguin.max_age - 1
+        self.assertTrue(penguin.is_alive())
+
+        penguin.age = penguin.max_age
+        self.assertFalse(penguin.is_alive())
+
     def test_animal_distance(self):
         """测试动物距离计算"""
         p1 = Penguin(id="p1", x=0, y=0, energy=50)
