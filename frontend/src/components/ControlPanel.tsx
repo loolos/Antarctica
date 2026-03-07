@@ -1,17 +1,14 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE_URL } from '../config';
 
 interface ControlPanelProps {
   connected: boolean;
-  onStart: () => void;
-  onStop: () => void;
   onReset: () => void;
   onStep: () => void;
 }
 
 export const ControlPanel: React.FC<ControlPanelProps> = ({
   connected,
-  onStart,
-  onStop,
   onReset,
   onStep,
 }) => {
@@ -21,7 +18,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
   // Load current speed from backend on mount
   useEffect(() => {
     if (connected) {
-      fetch('http://localhost:8000/speed')
+      fetch(`${API_BASE_URL}/speed`)
         .then(res => res.json())
         .then(data => {
           setSpeed(data.speed);
@@ -36,7 +33,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
     setSpeedDisplay(`${newSpeed.toFixed(1)}x`);
     
     try {
-      const response = await fetch('http://localhost:8000/speed', {
+      const response = await fetch(`${API_BASE_URL}/speed`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -53,33 +50,18 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
 
   const handleStart = async () => {
     try {
-      const response = await fetch('http://localhost:8000/start', {
+      await fetch(`${API_BASE_URL}/start`, {
         method: 'POST',
       });
-      if (response.ok) {
-        onStart();
-      }
     } catch (error) {
       console.error('Failed to start simulation:', error);
     }
   };
 
-  const handleStop = async () => {
-    try {
-      const response = await fetch('http://localhost:8000/stop', {
-        method: 'POST',
-      });
-      if (response.ok) {
-        onStop();
-      }
-    } catch (error) {
-      console.error('Failed to stop simulation:', error);
-    }
-  };
 
   const handleReset = async () => {
     try {
-      const response = await fetch('http://localhost:8000/reset', {
+      const response = await fetch(`${API_BASE_URL}/reset`, {
         method: 'POST',
       });
       if (response.ok) {
@@ -148,21 +130,6 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
           }}
         >
           Start
-        </button>
-        <button
-          onClick={handleStop}
-          disabled={!connected}
-          style={{
-            padding: '10px 20px',
-            background: '#ff6b6b',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: connected ? 'pointer' : 'not-allowed',
-            opacity: connected ? 1 : 0.5,
-          }}
-        >
-          Stop
         </button>
         <button
           onClick={handleReset}

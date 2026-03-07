@@ -145,7 +145,6 @@ Test Coverage:
 - `POST /step?n=1` - Advance simulation N steps (n: 1-100)
 - `POST /reset` - Reset simulation
 - `POST /start` - Start automatic running (5 ticks per second)
-- `POST /stop` - Stop automatic running
 
 ### WebSocket
 - `ws://localhost:8000/ws` - WebSocket connection

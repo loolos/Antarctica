@@ -101,7 +101,6 @@ Browser will open automatically, if not, manually visit `http://localhost:3000`
 
 ### Control Panel
 - **Start**: Start automatic simulation (5 ticks per second)
-- **Stop**: Stop automatic simulation
 - **Reset**: Reset simulation to initial state
 - **Step**: Manually advance one step
 
@@ -187,8 +186,6 @@ curl -X POST http://localhost:8000/reset
 # Start automatic running
 curl -X POST http://localhost:8000/start
 
-# Stop
-curl -X POST http://localhost:8000/stop
 ```
 
 ---

@@ -24,10 +24,15 @@ class SpeedRequest(BaseModel):
 app = FastAPI(title="Antarctic Ecosystem Simulation API")
 
 # CORS configuration
+frontend_origins = os.getenv("FRONTEND_ORIGINS", "*")
+allow_origins = [origin.strip() for origin in frontend_origins.split(",") if origin.strip()]
+if not allow_origins:
+    allow_origins = ["*"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, restrict to specific domains
-    allow_credentials=True,
+    allow_origins=allow_origins,
+    allow_credentials=allow_origins != ["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -151,32 +156,17 @@ async def start(service: SimulationService = Depends(get_simulation_service)):
     Start automatic simulation
     
     Starts the automatic simulation loop. The simulation will run continuously
-    at the configured speed (default: 5 ticks per second) until stopped.
+    at the configured speed (default: 5 ticks per second) until reset or service restart.
     State updates are automatically broadcast to all connected WebSocket clients.
     
     Returns:
         dict: Success message
         
     Note:
-        The simulation runs in the background. Use /stop to halt execution.
+        The simulation runs in the background until reset or service restart.
     """
     service.start()
     return {"message": "Simulation started"}
-
-
-@app.post("/stop", tags=["Control"])
-async def stop(service: SimulationService = Depends(get_simulation_service)):
-    """
-    Stop automatic simulation
-    
-    Stops the automatic simulation loop. The simulation state is preserved
-    and can be resumed by calling /start again.
-    
-    Returns:
-        dict: Success message
-    """
-    service.stop()
-    return {"message": "Simulation stopped"}
 
 
 @app.post("/speed", tags=["Control"])
