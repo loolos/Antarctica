@@ -79,6 +79,8 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
         background: '#2a2a3a',
         borderRadius: '8px',
         marginBottom: '20px',
+        width: '100%',
+        maxWidth: '800px',
       }}
     >
       <div style={{ marginBottom: '10px', color: connected ? '#00ff00' : '#ff0000' }}>
@@ -121,6 +123,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
           disabled={!connected}
           style={{
             padding: '10px 20px',
+            flex: '1 1 120px',
             background: '#4a9eff',
             color: 'white',
             border: 'none',
@@ -136,6 +139,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
           disabled={!connected}
           style={{
             padding: '10px 20px',
+            flex: '1 1 120px',
             background: '#ffa500',
             color: 'white',
             border: 'none',
@@ -151,6 +155,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
           disabled={!connected}
           style={{
             padding: '10px 20px',
+            flex: '1 1 120px',
             background: '#51cf66',
             color: 'white',
             border: 'none',

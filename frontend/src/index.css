@@ -12,11 +12,10 @@ body {
   -moz-osx-font-smoothing: grayscale;
   background: #1a1a2e;
   color: #eee;
-  overflow: hidden;
+  overflow: auto;
 }
 
 code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
     monospace;
 }
-
