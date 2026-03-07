@@ -18,18 +18,53 @@
 
 .App-main {
   width: 100%;
-  max-width: 900px;
+  max-width: 1000px;
   display: flex;
   flex-direction: column;
   align-items: center;
+  gap: 12px;
 }
 
 .canvas-container {
   width: 100%;
   display: flex;
-  justify-content: center;
+  justify-content: flex-start;
   background: #1a1a2e;
   padding: 20px;
   border-radius: 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
 }
 
+.mobile-scroll-hint {
+  display: none;
+  width: 100%;
+  text-align: center;
+  font-size: 13px;
+  color: #9bb1d8;
+}
+
+@media (max-width: 768px) {
+  .App {
+    padding: 12px;
+    align-items: stretch;
+  }
+
+  .App-header h1 {
+    font-size: 1.5rem;
+  }
+
+  .App-main {
+    max-width: none;
+    align-items: stretch;
+  }
+
+  .canvas-container {
+    padding: 10px;
+  }
+
+  .mobile-scroll-hint {
+    display: block;
+  }
+}

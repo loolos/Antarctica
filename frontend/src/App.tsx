@@ -20,6 +20,9 @@ function App() {
           }}
           onStep={sendStep}
         />
+        <p className="mobile-scroll-hint">
+          手机上可左右拖动查看完整模拟画面
+        </p>
         <div className="canvas-container">
           <SimulationCanvas worldState={state} />
         </div>
