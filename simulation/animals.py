@@ -73,8 +73,9 @@ class Animal:
     
     def is_alive(self) -> bool:
         """Check if alive"""
-        # No age limit - animals only die from energy depletion
-        return self.energy > 0
+        # Animals die when energy is depleted or when exceeding max age.
+        # Keep age check centralized here so engine cleanup only needs is_alive().
+        return self.energy > 0 and self.age < self.max_age
     
     def distance_to(self, other: 'Animal') -> float:
         """Calculate distance to another animal"""
@@ -228,4 +229,3 @@ class Fish(Animal):
             y=self.y + random.uniform(-3, 3),
             energy=25.0
         )
-
