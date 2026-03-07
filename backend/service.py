@@ -19,7 +19,7 @@ class SimulationService:
     This service acts as a facade for the SimulationEngine, providing
     a clean interface for the FastAPI backend. It manages:
     - Simulation engine instance
-    - Running state (start/stop)
+    - Running state (start/reset)
     - Speed control
     - WebSocket client connections
     
@@ -49,10 +49,6 @@ class SimulationService:
     def start(self):
         """Start automatic simulation"""
         self.is_running = True
-    
-    def stop(self):
-        """Stop automatic simulation"""
-        self.is_running = False
     
     def set_speed(self, speed: float):
         """Set simulation speed multiplier
