@@ -73,7 +73,12 @@ export function drawSeal(ctx: CanvasRenderingContext2D, options: SpriteOptions):
   const bellyColor = '#d4c4a8'; // Lighter belly
   const headColor = '#8b7355';
   const noseColor = '#000000';
-  const eyeColor = '#ffffff';
+  // Eye color by behavior: pink=searching, reddish-brown=targeting, black=idle
+  const eyeFillColor =
+    behaviorState === 'searching' ? '#ff69b4' :
+    behaviorState === 'targeting' ? '#8b4513' :
+    '#000000';
+  const eyeHighlightColor = '#ffffff';
   
   // Draw main body (large ellipse) with stretch animation
   ctx.fillStyle = bodyColor;
@@ -106,15 +111,15 @@ export function drawSeal(ctx: CanvasRenderingContext2D, options: SpriteOptions):
   ctx.fill();
   
   // Draw eyes
-  ctx.fillStyle = '#000000';
+  ctx.fillStyle = eyeFillColor;
   ctx.beginPath();
-  ctx.arc(-12 * scale, -4 * scale, 2 * scale, 0, Math.PI * 2);
+  ctx.arc(-12 * scale, -4 * scale, 2.5 * scale, 0, Math.PI * 2);
   ctx.fill();
   
   // Eye highlight
-  ctx.fillStyle = eyeColor;
+  ctx.fillStyle = eyeHighlightColor;
   ctx.beginPath();
-  ctx.arc(-11.5 * scale, -4.5 * scale, 0.8 * scale, 0, Math.PI * 2);
+  ctx.arc(-11.5 * scale, -4.5 * scale, 1 * scale, 0, Math.PI * 2);
   ctx.fill();
   
   // Draw flippers with animation

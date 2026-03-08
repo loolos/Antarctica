@@ -265,6 +265,7 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
         state: (seagull.state === 'grounded' ? 'grounded' : 'flying') as 'flying' | 'grounded',
         facing,
         animationTime,
+        behaviorState: seagull.behavior_state || 'idle',
       });
     });
 

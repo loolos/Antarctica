@@ -10,10 +10,11 @@ export interface SeagullSpriteOptions {
   state?: 'flying' | 'grounded';
   facing?: 'left' | 'right';
   animationTime?: number;
+  behaviorState?: string; // idle, searching, targeting, fleeing
 }
 
 export function drawSeagull(ctx: CanvasRenderingContext2D, options: SeagullSpriteOptions): void {
-  const { x, y, state = 'flying', facing = 'right', animationTime = 0, energy, maxEnergy } = options;
+  const { x, y, state = 'flying', facing = 'right', animationTime = 0, energy, maxEnergy, behaviorState = 'idle' } = options;
   const isFlying = state === 'flying';
   const energyPercent = maxEnergy > 0 ? energy / maxEnergy : 1;
 
@@ -69,10 +70,14 @@ export function drawSeagull(ctx: CanvasRenderingContext2D, options: SeagullSprit
     ctx.closePath();
     ctx.fill();
 
-    // eye
-    ctx.fillStyle = '#1b1b1b';
+    // eye (color by behavior: pink=searching, reddish-brown=targeting, dark=idle)
+    const flyingEyeColor =
+      behaviorState === 'searching' ? '#ff69b4' :
+      behaviorState === 'targeting' ? '#8b4513' :
+      '#1b1b1b';
+    ctx.fillStyle = flyingEyeColor;
     ctx.beginPath();
-    ctx.arc(-8.8, -2.4, 0.7, 0, Math.PI * 2);
+    ctx.arc(-8.8, -2.4, 1, 0, Math.PI * 2);
     ctx.fill();
   } else {
     // ===== STANDING POSE (grounded on land) =====
@@ -109,10 +114,14 @@ export function drawSeagull(ctx: CanvasRenderingContext2D, options: SeagullSprit
     ctx.closePath();
     ctx.fill();
 
-    // eye
-    ctx.fillStyle = '#1b1b1b';
+    // eye (color by behavior: pink=searching, reddish-brown=targeting, dark=idle)
+    const groundedEyeColor =
+      behaviorState === 'searching' ? '#ff69b4' :
+      behaviorState === 'targeting' ? '#8b4513' :
+      '#1b1b1b';
+    ctx.fillStyle = groundedEyeColor;
     ctx.beginPath();
-    ctx.arc(1.2, -6.8, 0.8, 0, Math.PI * 2);
+    ctx.arc(1.2, -6.8, 1.1, 0, Math.PI * 2);
     ctx.fill();
 
     // legs (standing)

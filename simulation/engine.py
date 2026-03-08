@@ -729,11 +729,28 @@ class SimulationEngine:
                             dx = math.cos(animal.hunt_direction_angle) * search_distance
                             dy = math.sin(animal.hunt_direction_angle) * search_distance
                 else:
-                    # In sea: normal searching (random direction, look for prey)
+                    # In sea: normal searching (random direction, but prefer away from floe if too close)
                     if animal.hunt_direction_ticks <= 0:
                         config = get_config()
                         animal.hunt_direction_ticks = random.randint(config.HUNTING_DIRECTION_TICKS_MIN, config.HUNTING_DIRECTION_TICKS_MAX)
-                        animal.hunt_direction_angle = random.uniform(0, 2 * math.pi)
+                        # Check if too close to any floe - if so, prefer swimming away
+                        nearest_floe = None
+                        min_dist = float('inf')
+                        for floe in self.world.environment.ice_floes:
+                            dist = math.sqrt((animal.x - floe['x'])**2 + (animal.y - floe['y'])**2)
+                            if dist < min_dist:
+                                min_dist = dist
+                                nearest_floe = floe
+                        if nearest_floe and min_dist < config.SEA_SEARCH_AVOID_FLOE_RANGE:
+                            # Prefer direction away from floe, with some random variation
+                            away_dx = animal.x - nearest_floe['x']
+                            away_dy = animal.y - nearest_floe['y']
+                            away_angle = math.atan2(away_dy, away_dx)
+                            # Add random variation (±45 degrees)
+                            animal.hunt_direction_angle = away_angle + random.uniform(-0.785398, 0.785398)
+                            animal.hunt_direction_angle = animal.hunt_direction_angle % (2 * math.pi)
+                        else:
+                            animal.hunt_direction_angle = random.uniform(0, 2 * math.pi)
                     
                     animal.hunt_direction_ticks -= 1
                     search_distance = 30 + random.uniform(0, 20)

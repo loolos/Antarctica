@@ -72,6 +72,7 @@ class SimulationConfig:
     PREY_SEARCH_RANGE: float = 200.0  # Search range for prey
     SEAL_LAND_PENGUIN_HUNT_RANGE: float = 80.0  # Seal on land: hunt penguin only if within this (very close)
     PREY_EXPLORATION_RANGE: float = 600.0  # Exploration range for regular hunting
+    SEA_SEARCH_AVOID_FLOE_RANGE: float = 150.0  # In sea searching: if within this of floe center, prefer swimming away
     
     # Boundary settings
     EDGE_MARGIN: float = 50.0  # Consider near edge if within this distance
