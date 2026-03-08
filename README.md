@@ -1,5 +1,7 @@
 # Antarctic Ecosystem Simulation Game
 
+Try at: https://antarctica.onrender.com/
+Backend:https://antarcticabackend.onrender.com/
 A three-layer architecture Antarctic ecosystem simulator featuring penguins, seals, fish, and environmental interactions.
 
 ## Architecture Design
