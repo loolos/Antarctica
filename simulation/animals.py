@@ -202,6 +202,35 @@ class Seal(Animal):
 
 
 @dataclass
+class Seagull(Animal):
+    """Seagull"""
+    state: Literal["land", "sea"] = "sea"
+
+    def __post_init__(self):
+        self.max_energy = 120.0
+        self.max_age = 900
+        self.land_speed = 1.8
+        self.water_speed = 3.8
+        self.maturity_age = 80
+
+    def is_juvenile(self) -> bool:
+        return self.age < self.maturity_age
+
+    def get_speed(self, is_water: bool) -> float:
+        base_speed = self.water_speed if is_water else self.land_speed
+        if self.is_juvenile():
+            return base_speed * 0.6
+        return base_speed
+
+    def tick(self):
+        super().tick()
+        if self.hunting_cooldown > 0:
+            self.hunting_cooldown -= 1
+        if self.flee_cooldown > 0:
+            self.flee_cooldown -= 1
+
+
+@dataclass
 class Fish(Animal):
     """Fish"""
     speed: float = 1.0  # Deprecated, use water_speed

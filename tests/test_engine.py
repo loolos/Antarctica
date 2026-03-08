@@ -23,6 +23,7 @@ class TestSimulationEngine(unittest.TestCase):
         self.assertGreater(len(state.penguins), 0)
         self.assertGreater(len(state.seals), 0)
         self.assertGreater(len(state.fish), 0)
+        self.assertGreater(len(state.seagulls), 0)
         self.assertEqual(state.tick, 0)
     
     def test_tick(self):
@@ -48,6 +49,7 @@ class TestSimulationEngine(unittest.TestCase):
         self.assertIn('penguins', state_dict)
         self.assertIn('seals', state_dict)
         self.assertIn('fish', state_dict)
+        self.assertIn('seagulls', state_dict)
         self.assertIn('environment', state_dict)
         
         # 检查企鹅数据格式

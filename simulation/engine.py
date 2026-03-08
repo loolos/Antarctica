@@ -15,7 +15,7 @@ import random
 import math
 from typing import List, Optional, Tuple
 from .world import WorldState
-from .animals import Penguin, Seal, Fish, Animal
+from .animals import Penguin, Seal, Fish, Seagull, Animal
 from .environment import Environment
 from .config import get_config
 from .spatial import SpatialGrid
@@ -162,6 +162,23 @@ class SimulationEngine:
             self.world.fish.append(fish)
             # Add to spatial grid
             self.spatial_grid.add(fish)
+
+        # Create initial seagulls
+        for i in range(config.INITIAL_SEAGULLS):
+            x = random.uniform(0, self.world.environment.width)
+            y = random.uniform(0, self.world.environment.height)
+            seagull = Seagull(
+                id=f"seagull_{i}",
+                x=x,
+                y=y,
+                energy=random.uniform(50, 90),
+                state="land" if self.world.environment.is_land(x, y) else "sea",
+            )
+            seagull.age = random.randint(0, 180)
+            seagull.last_x = seagull.x
+            seagull.last_y = seagull.y
+            self.world.seagulls.append(seagull)
+            self.spatial_grid.add(seagull)
     
     def tick(self):
         """
@@ -261,6 +278,11 @@ class SimulationEngine:
         for fish in self.world.fish:
             fish.tick()
             self._move_animal(fish)
+
+        # Update seagulls
+        for seagull in self.world.seagulls:
+            seagull.tick()
+            self._move_animal(seagull)
     
     def _move_animal(self, animal):
         """Move animal with physics and AI"""
@@ -274,7 +296,7 @@ class SimulationEngine:
             animal.state = "sea"
         
         # Determine speed based on location and age
-        if isinstance(animal, (Penguin, Seal)):
+        if isinstance(animal, (Penguin, Seal, Seagull)):
             speed = animal.get_speed(not is_on_land)  # True for water, False for land
         else:
             # For fish and other animals, use original logic
@@ -411,7 +433,7 @@ class SimulationEngine:
         # 1.5. Update behavior state based on energy
         # Enter searching mode when energy drops below 60%
         # But not if in hunting cooldown (recently ate) or energy > 90% (socializing)
-        if isinstance(animal, (Penguin, Seal)):
+        if isinstance(animal, (Penguin, Seal, Seagull)):
             energy_percent = animal.energy / animal.max_energy
             # Only change to searching if not fleeing, targeting, in hunting cooldown, or energy > high threshold
             config = get_config()
@@ -984,7 +1006,7 @@ class SimulationEngine:
         # 4. Active Exploration (if no other drive, for Penguins and Seals)
         # Instead of small random movements, make them explore larger areas
         if dx == 0 and dy == 0:
-            if isinstance(animal, (Penguin, Seal)):
+            if isinstance(animal, (Penguin, Seal, Seagull)):
                 # Active exploration: move towards unexplored areas
                 # On land, explore the ice floe; in sea, explore the ocean
                 if is_on_land:
@@ -1451,6 +1473,12 @@ class SimulationEngine:
         for fish in dead_fish:
             self.spatial_grid.remove(fish)
         self.world.fish = [f for f in self.world.fish if f.is_alive()]
+
+        # Remove dead seagulls
+        dead_seagulls = [g for g in self.world.seagulls if not g.is_alive()]
+        for seagull in dead_seagulls:
+            self.spatial_grid.remove(seagull)
+        self.world.seagulls = [g for g in self.world.seagulls if g.is_alive()]
     
     def get_state(self) -> WorldState:
         """
