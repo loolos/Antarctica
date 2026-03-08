@@ -70,10 +70,11 @@ export function drawSeagull(ctx: CanvasRenderingContext2D, options: SeagullSprit
     ctx.closePath();
     ctx.fill();
 
-    // eye (color by behavior: pink=searching, reddish-brown=targeting, dark=idle)
+    // eye (color by behavior: pink=searching, reddish-brown=targeting, green=fleeing, dark=idle)
     const flyingEyeColor =
       behaviorState === 'searching' ? '#ff69b4' :
       behaviorState === 'targeting' ? '#8b4513' :
+      behaviorState === 'fleeing' ? '#22c55e' :
       '#1b1b1b';
     ctx.fillStyle = flyingEyeColor;
     ctx.beginPath();
@@ -114,10 +115,11 @@ export function drawSeagull(ctx: CanvasRenderingContext2D, options: SeagullSprit
     ctx.closePath();
     ctx.fill();
 
-    // eye (color by behavior: pink=searching, reddish-brown=targeting, dark=idle)
+    // eye (color by behavior: pink=searching, reddish-brown=targeting, green=fleeing, dark=idle)
     const groundedEyeColor =
       behaviorState === 'searching' ? '#ff69b4' :
       behaviorState === 'targeting' ? '#8b4513' :
+      behaviorState === 'fleeing' ? '#22c55e' :
       '#1b1b1b';
     ctx.fillStyle = groundedEyeColor;
     ctx.beginPath();

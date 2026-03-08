@@ -20,8 +20,8 @@ class SimulationConfig:
     # Penguin settings
     PENGUIN_MAX_ENERGY: float = 150.0
     PENGUIN_MATURITY_AGE: int = 100
-    PENGUIN_PERCEPTION_LAND: float = 60.0  # Reduced perception on land
-    PENGUIN_PERCEPTION_SEA: float = 150.0   # Normal perception in sea
+    PENGUIN_PERCEPTION_LAND: float = 80.0  # Reduced perception on land (60 + 20)
+    PENGUIN_PERCEPTION_SEA: float = 170.0   # Normal perception in sea (150 + 20)
     PENGUIN_ENERGY_RECOVERY_FISH: float = 75.0  # 50% of max energy
     PENGUIN_BASE_SCALE: float = 0.9  # Size scaling for rendering
     

@@ -439,7 +439,7 @@ class SimulationEngine:
             config = get_config()
             energy_percent = animal.energy / animal.max_energy
             if energy_percent > config.ENERGY_THRESHOLD_HIGH:
-                same_type = [g for g in self.world.seagulls if g.id != animal.id and g.is_alive() and g.state == "grounded"]
+                same_type = [g for g in self.world.seagulls if g.id != animal.id and g.is_alive() and g.state == "grounded" and g.behavior_state == "idle"]
                 nearby = [a for a in same_type if animal.distance_to(a) < 50]
                 if nearby:
                     if len(nearby) > 3:
@@ -474,14 +474,16 @@ class SimulationEngine:
                 
                 if same_type:
                     nearby = [a for a in same_type if animal.distance_to(a) < 150]  # Social grouping range 3x (was 50)
+                    # Huddling only considers idle same-species; dispersal considers all
+                    nearby_idle = [a for a in nearby if a.behavior_state == "idle"]
                     if nearby:
-                        if has_energy_for_social:
-                            # Energy > 60%: Social grouping behavior (huddling)
-                            # If too crowded (more than 3 nearby), move away slightly
-                            if len(nearby) > 3:
-                                # Move away from center of nearby animals
-                                center_x = sum(a.x for a in nearby) / len(nearby)
-                                center_y = sum(a.y for a in nearby) / len(nearby)
+                        if has_energy_for_social and nearby_idle:
+                            # Energy > 60%: Social grouping behavior (huddling) - only with idle
+                            # If too crowded (more than 3 nearby idle), move away slightly
+                            if len(nearby_idle) > 3:
+                                # Move away from center of nearby idle animals
+                                center_x = sum(a.x for a in nearby_idle) / len(nearby_idle)
+                                center_y = sum(a.y for a in nearby_idle) / len(nearby_idle)
                                 dx = animal.x - center_x
                                 dy = animal.y - center_y
                                 # Ensure meaningful movement
@@ -490,8 +492,8 @@ class SimulationEngine:
                                     dx += random.uniform(-20, 20)
                                     dy += random.uniform(-20, 20)
                             else:
-                                # Move towards a nearby animal (social grouping - huddling)
-                                target_animal = random.choice(nearby)
+                                # Move towards a nearby idle animal (social grouping - huddling)
+                                target_animal = random.choice(nearby_idle)
                                 dx = target_animal.x - animal.x
                                 dy = target_animal.y - animal.y
                                 # Make movement subtle for gentle grouping
@@ -699,6 +701,7 @@ class SimulationEngine:
                         animal.hunt_direction_ticks = 0
                     else:
                         # Penguin or Seal with no close penguin: walk straight toward sea (away from floe)
+                        # Fix direction once and keep it - never change until reaching sea (fleeing overrides elsewhere)
                         nearest_floe = None
                         min_dist = float('inf')
                         for floe in self.world.environment.ice_floes:
@@ -708,17 +711,19 @@ class SimulationEngine:
                                 nearest_floe = floe
                         
                         if nearest_floe:
-                            # Move away from ice floe center toward sea
-                            dx = animal.x - nearest_floe['x']
-                            dy = animal.y - nearest_floe['y']
-                            dist = math.sqrt(dx*dx + dy*dy)
-                            if dist > 0:
-                                dx = (dx / dist) * 50
-                                dy = (dy / dist) * 50
-                            else:
-                                angle = random.uniform(0, 2 * math.pi)
-                                dx = math.cos(angle) * 50
-                                dy = math.sin(angle) * 50
+                            # Set direction once when hunt_direction_ticks <= 0; never change while on land
+                            if animal.hunt_direction_ticks <= 0:
+                                away_dx = animal.x - nearest_floe['x']
+                                away_dy = animal.y - nearest_floe['y']
+                                dist = math.sqrt(away_dx*away_dx + away_dy*away_dy)
+                                if dist > 0:
+                                    animal.hunt_direction_angle = math.atan2(away_dy, away_dx)
+                                else:
+                                    animal.hunt_direction_angle = random.uniform(0, 2 * math.pi)
+                                animal.hunt_direction_ticks = 99999  # Never change direction while on land
+                            # Walk in fixed direction
+                            dx = math.cos(animal.hunt_direction_angle) * 50
+                            dy = math.sin(animal.hunt_direction_angle) * 50
                         else:
                             # No floe - random direction as fallback
                             if animal.hunt_direction_ticks <= 0:
@@ -1047,11 +1052,34 @@ class SimulationEngine:
                         dx = math.cos(angle) * exploration_distance
                         dy = math.sin(angle) * exploration_distance
                 else:
-                    # In sea: explore larger areas
+                    # In sea (or flying for seagull): explore - same direction persistence as searching
+                    # Walk one direction for a few seconds, then randomly change
+                    config = get_config()
+                    if animal.hunt_direction_ticks <= 0:
+                        animal.hunt_direction_ticks = random.randint(config.HUNTING_DIRECTION_TICKS_MIN, config.HUNTING_DIRECTION_TICKS_MAX)
+                        # If too close to floe, prefer swimming away (same as searching)
+                        if isinstance(animal, (Penguin, Seal)):
+                            nearest_floe = None
+                            min_dist = float('inf')
+                            for floe in self.world.environment.ice_floes:
+                                dist = math.sqrt((animal.x - floe['x'])**2 + (animal.y - floe['y'])**2)
+                                if dist < min_dist:
+                                    min_dist = dist
+                                    nearest_floe = floe
+                            if nearest_floe and min_dist < config.SEA_SEARCH_AVOID_FLOE_RANGE:
+                                away_dx = animal.x - nearest_floe['x']
+                                away_dy = animal.y - nearest_floe['y']
+                                away_angle = math.atan2(away_dy, away_dx)
+                                animal.hunt_direction_angle = away_angle + random.uniform(-0.785398, 0.785398)
+                                animal.hunt_direction_angle = animal.hunt_direction_angle % (2 * math.pi)
+                            else:
+                                animal.hunt_direction_angle = random.uniform(0, 2 * math.pi)
+                        else:
+                            animal.hunt_direction_angle = random.uniform(0, 2 * math.pi)
+                    animal.hunt_direction_ticks -= 1
                     exploration_distance = 50 + random.uniform(0, 100)  # 50-150 units
-                    angle = random.uniform(0, 2 * math.pi)
-                    dx = math.cos(angle) * exploration_distance
-                    dy = math.sin(angle) * exploration_distance
+                    dx = math.cos(animal.hunt_direction_angle) * exploration_distance
+                    dy = math.sin(animal.hunt_direction_angle) * exploration_distance
             else:
                 # Fish: smaller random movement
                 dx = random.uniform(-10, 10)

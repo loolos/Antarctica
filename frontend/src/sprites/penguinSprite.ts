@@ -129,10 +129,11 @@ export function drawPenguin(ctx: CanvasRenderingContext2D, options: SpriteOption
   ctx.ellipse(-2 * scale, -14 * scale, 4 * scale, 5 * scale, 0, 0, Math.PI * 2);
   ctx.fill();
   
-  // Draw eyes (color varies by behavior: pink=searching, reddish-brown=targeting, black=idle)
+  // Draw eyes (color varies by behavior: pink=searching, reddish-brown=targeting, green=fleeing, black=idle)
   const eyeColor =
     behaviorState === 'searching' ? '#ff69b4' :
     behaviorState === 'targeting' ? '#8b4513' :
+    behaviorState === 'fleeing' ? '#22c55e' :
     '#000000';
   ctx.fillStyle = eyeColor;
   ctx.beginPath();

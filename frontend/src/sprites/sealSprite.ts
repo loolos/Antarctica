@@ -73,10 +73,11 @@ export function drawSeal(ctx: CanvasRenderingContext2D, options: SpriteOptions):
   const bellyColor = '#d4c4a8'; // Lighter belly
   const headColor = '#8b7355';
   const noseColor = '#000000';
-  // Eye color by behavior: pink=searching, reddish-brown=targeting, black=idle
+  // Eye color by behavior: pink=searching, reddish-brown=targeting, green=fleeing, black=idle
   const eyeFillColor =
     behaviorState === 'searching' ? '#ff69b4' :
     behaviorState === 'targeting' ? '#8b4513' :
+    behaviorState === 'fleeing' ? '#22c55e' :
     '#000000';
   const eyeHighlightColor = '#ffffff';
   
