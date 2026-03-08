@@ -8,7 +8,7 @@ import io
 
 # Removed manual encoding override to prevent conflicts
 
-# 添加项目根目录到路径
+# Add project root to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 def run_all_tests():

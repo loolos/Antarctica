@@ -24,7 +24,11 @@ function App() {
           Drag horizontally on mobile to view the full simulation area
         </p>
         <div className="canvas-container">
-          <SimulationCanvas worldState={state} />
+          <SimulationCanvas
+            worldState={state}
+            width={state?.environment?.width ?? 1280}
+            height={state?.environment?.height ?? 960}
+          />
         </div>
       </main>
     </div>

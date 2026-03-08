@@ -10,6 +10,7 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from simulation.engine import SimulationEngine
+from simulation.config import get_config
 
 
 class SimulationService:
@@ -33,15 +34,18 @@ class SimulationService:
         websocket_clients (List[WebSocket]): Connected WebSocket clients
     """
     
-    def __init__(self, width: int = 800, height: int = 600):
+    def __init__(self, width: Optional[int] = None, height: Optional[int] = None):
         """
         Initialize simulation service.
         
         Args:
-            width: World width in pixels (default: 800)
-            height: World height in pixels (default: 600)
+            width: World width in pixels (default: from config)
+            height: World height in pixels (default: from config)
         """
-        self.engine = SimulationEngine(width=width, height=height)
+        config = get_config()
+        w = width if width is not None else config.WORLD_WIDTH
+        h = height if height is not None else config.WORLD_HEIGHT
+        self.engine = SimulationEngine(width=w, height=h)
         self.is_running = False
         self.speed = 1.0  # Speed multiplier (1.0 = normal, 5 ticks/sec)
         self.websocket_clients: List[WebSocket] = []
@@ -49,6 +53,10 @@ class SimulationService:
     def start(self):
         """Start automatic simulation"""
         self.is_running = True
+
+    def stop(self):
+        """Pause/stop automatic simulation"""
+        self.is_running = False
     
     def set_speed(self, speed: float):
         """Set simulation speed multiplier

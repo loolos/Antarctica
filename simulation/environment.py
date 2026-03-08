@@ -8,8 +8,8 @@ from typing import Tuple
 @dataclass
 class Environment:
     """Environment state"""
-    width: int = 800
-    height: int = 600
+    width: int = 1280
+    height: int = 960
     ice_coverage: float = 0.8
     temperature: float = -10.0
     sea_level: float = 100.0
@@ -25,11 +25,11 @@ class Environment:
         import random
         import math
         self.ice_floes = []
-        # Generate 4-7 random ice islands (fewer but larger)
-        num_floes = random.randint(4, 7)
+        # Generate 10-14 random ice islands
+        num_floes = random.randint(10, 14)
         for _ in range(num_floes):
-            # Larger radius range: 60-150 (was 30-80)
-            base_radius = random.uniform(60, 150)
+            # Radius range: 55-130 (scaled for larger map)
+            base_radius = random.uniform(55, 130)
             
             # Shape type: 'circle', 'ellipse', or 'irregular'
             shape_type = random.choice(['circle', 'ellipse', 'ellipse', 'irregular'])

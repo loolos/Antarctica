@@ -212,6 +212,25 @@ async def set_speed(
         )
 
 
+@app.post("/pause", tags=["Control"])
+async def pause(service: SimulationService = Depends(get_simulation_service)):
+    """
+    Pause automatic simulation
+    
+    Stops the simulation loop. State is preserved; use POST /start to resume.
+    """
+    service.stop()
+    return {"message": "Simulation paused"}
+
+
+@app.get("/running", tags=["Control"])
+async def get_running(service: SimulationService = Depends(get_simulation_service)):
+    """
+    Get whether simulation is currently running
+    """
+    return {"running": service.is_running}
+
+
 @app.get("/speed", tags=["Control"])
 async def get_speed(service: SimulationService = Depends(get_simulation_service)):
     """

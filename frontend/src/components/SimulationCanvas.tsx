@@ -10,8 +10,8 @@ interface SimulationCanvasProps {
 
 export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
   worldState,
-  width = 800,
-  height = 600,
+  width = 1280,
+  height = 960,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const animationFrameRef = useRef<number>();
@@ -262,6 +262,7 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
         y: anim.y,
         energy: seagull.energy,
         maxEnergy: seagull.max_energy,
+        state: (seagull.state === 'grounded' ? 'grounded' : 'flying') as 'flying' | 'grounded',
         facing,
         animationTime,
       });
@@ -303,8 +304,8 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
           }
         }
       }
-      // Use actual position check, fallback to state field if available
-      const actualState = isActuallyOnLand ? 'land' : (penguin.state || 'sea');
+      // Use actual position check, fallback to state field if available (penguins only use land/sea)
+      const actualState: 'land' | 'sea' = isActuallyOnLand ? 'land' : (penguin.state === 'land' ? 'land' : 'sea');
       
       drawPenguin(ctx, {
         x: anim.x,
@@ -344,7 +345,7 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
       drawSeal(ctx, {
         x: anim.x,
         y: anim.y,
-        state: seal.state || 'sea',
+        state: (seal.state === 'land' ? 'land' : 'sea'),
         energy: seal.energy,
         maxEnergy: seal.max_energy,
         facing,

@@ -121,13 +121,13 @@ class Penguin(Animal):
         return base_speed
     
     def can_breed(self) -> bool:
-        """检查是否可以繁殖"""
+        """Check if can breed"""
         return (self.breeding_cooldown == 0 and 
                 self.energy > 80 and 
                 self.state == "land")
     
     def breed(self) -> 'Penguin':
-        """繁殖"""
+        """Breed and produce offspring"""
         self.breeding_cooldown = self.max_breeding_cooldown
         self.consume_energy(30)
         return Penguin(
@@ -203,27 +203,66 @@ class Seal(Animal):
 
 @dataclass
 class Seagull(Animal):
-    """Seagull"""
-    state: Literal["land", "sea"] = "sea"
+    """Seagull - flying or grounded on ice floes. Can hunt fish, socialize when full, flee only when grounded."""
+    state: Literal["flying", "grounded"] = "flying"
+    breeding_cooldown: int = 0
+    max_breeding_cooldown: int = 250
 
     def __post_init__(self):
         self.max_energy = 120.0
         self.max_age = 900
-        self.land_speed = 1.8
-        self.water_speed = 3.8
+        self.land_speed = 1.5   # On ice (grounded)
+        self.water_speed = 6.0  # Flying speed (faster than penguin/seal swimming)
         self.maturity_age = 80
 
     def is_juvenile(self) -> bool:
         return self.age < self.maturity_age
 
     def get_speed(self, is_water: bool) -> float:
-        base_speed = self.water_speed if is_water else self.land_speed
+        # When flying, use water_speed (fast). When grounded, use land_speed.
+        base_speed = self.water_speed if self.state == "flying" else self.land_speed
         if self.is_juvenile():
             return base_speed * 0.6
         return base_speed
 
+    def can_breed(self) -> bool:
+        """Can breed only when grounded on ice floe (checked by engine)"""
+        return (self.breeding_cooldown == 0 and
+                self.energy > 90 and
+                self.state == "grounded")
+
+    def breed(self) -> 'Seagull':
+        """Breed"""
+        self.breeding_cooldown = self.max_breeding_cooldown
+        self.consume_energy(35)
+        return Seagull(
+            id=f"seagull_{random.randint(10000, 99999)}",
+            x=self.x + random.uniform(-5, 5),
+            y=self.y + random.uniform(-5, 5),
+            energy=60.0,
+            state="grounded"
+        )
+
+    def move(self, dx: float, dy: float, world_width: int, world_height: int):
+        """Override: flying consumes 2x movement energy"""
+        from .config import get_config
+        config = get_config()
+        base_consumption = config.ENERGY_CONSUMPTION_MOVE
+        result = super().move(dx, dy, world_width, world_height)
+        # Flying: add extra consumption (total 2x)
+        if self.state == "flying":
+            self.consume_energy(base_consumption)
+        return result
+
     def tick(self):
         super().tick()
+        # Flying: add extra basal consumption (total 2x for tick)
+        if self.state == "flying":
+            from .config import get_config
+            config = get_config()
+            self.consume_energy(config.ENERGY_CONSUMPTION_TICK)
+        if self.breeding_cooldown > 0:
+            self.breeding_cooldown -= 1
         if self.hunting_cooldown > 0:
             self.hunting_cooldown -= 1
         if self.flee_cooldown > 0:

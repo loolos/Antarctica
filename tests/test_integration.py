@@ -1,5 +1,5 @@
 """
-集成测试 - 测试整个系统
+Integration tests - test the entire system
 """
 import unittest
 import sys
@@ -12,18 +12,18 @@ from simulation.engine import SimulationEngine
 
 
 class TestIntegration(unittest.TestCase):
-    """集成测试"""
+    """Integration tests"""
     
     def test_full_simulation_cycle(self):
-        """测试完整模拟周期"""
+        """Test full simulation cycle"""
         engine = SimulationEngine()
         
-        # 运行1000步
+        # Run 1000 steps
         engine.step(1000)
         
         state = engine.get_state()
         
-        # 验证状态完整性
+        # Verify state integrity
         self.assertGreater(state.tick, 0)
         self.assertIsNotNone(state.environment)
         self.assertIsInstance(state.penguins, list)
@@ -31,20 +31,20 @@ class TestIntegration(unittest.TestCase):
         self.assertIsInstance(state.fish, list)
         self.assertIsInstance(state.seagulls, list)
         
-        # 验证环境参数
+        # Verify environment parameters
         self.assertGreaterEqual(state.environment.ice_coverage, 0)
         self.assertLessEqual(state.environment.ice_coverage, 1)
         self.assertIsNotNone(state.environment.temperature)
     
     def test_state_consistency(self):
-        """测试状态一致性"""
+        """Test state consistency"""
         engine = SimulationEngine()
         
         for _ in range(10):
             engine.tick()
             state = engine.get_state()
             
-            # 验证所有动物都有有效位置
+            # Verify all animals have valid positions
             for penguin in state.penguins:
                 self.assertGreaterEqual(penguin.x, 0)
                 self.assertLessEqual(penguin.x, state.environment.width)
@@ -71,39 +71,39 @@ class TestIntegration(unittest.TestCase):
                 self.assertLessEqual(seagull.y, state.environment.height)
     
     def test_json_serialization(self):
-        """测试JSON序列化"""
+        """Test JSON serialization"""
         engine = SimulationEngine()
         engine.step(50)
         
         state = engine.get_state()
         state_dict = state.to_dict()
         
-        # 尝试序列化为JSON
+        # Try serializing to JSON
         json_str = json.dumps(state_dict)
         self.assertIsInstance(json_str, str)
         
-        # 尝试反序列化
+        # Try deserializing
         parsed = json.loads(json_str)
         self.assertEqual(parsed['tick'], state.tick)
         self.assertEqual(len(parsed['penguins']), len(state.penguins))
     
     def test_long_running_simulation(self):
-        """测试长时间运行"""
+        """Test long-running simulation"""
         engine = SimulationEngine()
         
-        # 运行5000步
+        # Run 5000 steps
         engine.step(5000)
         
         state = engine.get_state()
         
-        # 系统应该仍然正常运行
+        # System should still be running normally
         self.assertEqual(state.tick, 5000)
         self.assertIsNotNone(state.environment)
         
-        # 至少应该还有一些动物存活（除非全部被捕食）
+        # At least some animals may survive (unless all are predated)
         total_animals = len(state.penguins) + len(state.seals) + len(state.fish) + len(state.seagulls)
-        # 由于捕食关系，可能所有动物都死亡，这是正常的
-        # 但系统不应该崩溃
+        # Due to predation, all animals may die, which is normal
+        # But the system should not crash
         self.assertIsInstance(total_animals, int)
         self.assertGreaterEqual(total_animals, 0)
 

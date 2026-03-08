@@ -14,8 +14,9 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
 }) => {
   const [speed, setSpeed] = useState(1.0);
   const [speedDisplay, setSpeedDisplay] = useState('1.0x');
+  const [isRunning, setIsRunning] = useState(false);
 
-  // Load current speed from backend on mount
+  // Load current speed and running status from backend on mount
   useEffect(() => {
     if (connected) {
       fetch(`${API_BASE_URL}/speed`)
@@ -25,6 +26,10 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
           setSpeedDisplay(`${data.speed.toFixed(1)}x`);
         })
         .catch(err => console.error('Failed to get speed:', err));
+      fetch(`${API_BASE_URL}/running`)
+        .then(res => res.json())
+        .then(data => setIsRunning(data.running))
+        .catch(err => console.error('Failed to get running status:', err));
     }
   }, [connected]);
 
@@ -53,8 +58,20 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
       await fetch(`${API_BASE_URL}/start`, {
         method: 'POST',
       });
+      setIsRunning(true);
     } catch (error) {
       console.error('Failed to start simulation:', error);
+    }
+  };
+
+  const handlePause = async () => {
+    try {
+      await fetch(`${API_BASE_URL}/pause`, {
+        method: 'POST',
+      });
+      setIsRunning(false);
+    } catch (error) {
+      console.error('Failed to pause simulation:', error);
     }
   };
 
@@ -65,6 +82,7 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
         method: 'POST',
       });
       if (response.ok) {
+        setIsRunning(false);
         onReset();
       }
     } catch (error) {
@@ -118,22 +136,41 @@ export const ControlPanel: React.FC<ControlPanelProps> = ({
       </div>
 
       <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-        <button
-          onClick={handleStart}
-          disabled={!connected}
-          style={{
-            padding: '10px 20px',
-            flex: '1 1 120px',
-            background: '#4a9eff',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: connected ? 'pointer' : 'not-allowed',
-            opacity: connected ? 1 : 0.5,
-          }}
-        >
-          Start
-        </button>
+        {isRunning ? (
+          <button
+            onClick={handlePause}
+            disabled={!connected}
+            style={{
+              padding: '10px 20px',
+              flex: '1 1 120px',
+              background: '#e74c3c',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: connected ? 'pointer' : 'not-allowed',
+              opacity: connected ? 1 : 0.5,
+            }}
+          >
+            Pause
+          </button>
+        ) : (
+          <button
+            onClick={handleStart}
+            disabled={!connected}
+            style={{
+              padding: '10px 20px',
+              flex: '1 1 120px',
+              background: '#4a9eff',
+              color: 'white',
+              border: 'none',
+              borderRadius: '4px',
+              cursor: connected ? 'pointer' : 'not-allowed',
+              opacity: connected ? 1 : 0.5,
+            }}
+          >
+            Start
+          </button>
+        )}
         <button
           onClick={handleReset}
           disabled={!connected}

@@ -1,5 +1,5 @@
 """
-测试模拟引擎
+Test simulation engine
 """
 import unittest
 import sys
@@ -11,14 +11,14 @@ from simulation.engine import SimulationEngine
 
 
 class TestSimulationEngine(unittest.TestCase):
-    """测试模拟引擎"""
+    """Test simulation engine"""
     
     def setUp(self):
-        """设置测试环境"""
+        """Set up test environment"""
         self.engine = SimulationEngine(width=800, height=600)
     
     def test_engine_initialization(self):
-        """测试引擎初始化"""
+        """Test engine initialization"""
         state = self.engine.get_state()
         self.assertGreater(len(state.penguins), 0)
         self.assertGreater(len(state.seals), 0)
@@ -27,21 +27,21 @@ class TestSimulationEngine(unittest.TestCase):
         self.assertEqual(state.tick, 0)
     
     def test_tick(self):
-        """测试单步tick"""
+        """Test single tick"""
         initial_tick = self.engine.get_state().tick
         self.engine.tick()
         new_tick = self.engine.get_state().tick
         self.assertEqual(new_tick, initial_tick + 1)
     
     def test_step(self):
-        """测试多步推进"""
+        """Test multiple steps"""
         initial_tick = self.engine.get_state().tick
         self.engine.step(10)
         new_tick = self.engine.get_state().tick
         self.assertEqual(new_tick, initial_tick + 10)
     
     def test_state_serialization(self):
-        """测试状态序列化"""
+        """Test state serialization"""
         state = self.engine.get_state()
         state_dict = state.to_dict()
         
@@ -52,7 +52,7 @@ class TestSimulationEngine(unittest.TestCase):
         self.assertIn('seagulls', state_dict)
         self.assertIn('environment', state_dict)
         
-        # 检查企鹅数据格式
+        # Check penguin data format
         if len(state_dict['penguins']) > 0:
             penguin = state_dict['penguins'][0]
             self.assertIn('id', penguin)
@@ -61,62 +61,61 @@ class TestSimulationEngine(unittest.TestCase):
             self.assertIn('energy', penguin)
     
     def test_predation(self):
-        """测试捕食机制"""
-        # 运行多步，观察捕食是否发生
+        """Test predation mechanism"""
+        # Run multiple steps to observe predation
         initial_fish_count = len(self.engine.get_state().fish)
         initial_penguin_count = len(self.engine.get_state().penguins)
         
-        # 运行足够多的步数让捕食发生
+        # Run enough steps for predation to occur
         self.engine.step(100)
         
         state = self.engine.get_state()
-        # 由于捕食和繁殖，数量可能会变化
-        # 至少确保系统还在运行
+        # Count may change due to predation and breeding
+        # At least ensure the system is still running
         self.assertGreaterEqual(len(state.fish), 0)
         self.assertGreaterEqual(len(state.penguins), 0)
     
     def test_breeding(self):
-        """测试繁殖机制"""
+        """Test breeding mechanism"""
         initial_penguin_count = len(self.engine.get_state().penguins)
         
-        # 给企鹅足够的能量并运行多步
+        # Give penguins enough energy and run multiple steps
         for penguin in self.engine.get_state().penguins:
             penguin.energy = 100
             penguin.breeding_cooldown = 0
         
         self.engine.step(200)
         
-        # 由于繁殖，企鹅数量可能会增加
-        # 但由于捕食，也可能减少
+        # Penguin count may increase due to breeding or decrease due to predation
         final_count = len(self.engine.get_state().penguins)
-        # 至少确保系统还在运行
+        # At least ensure the system is still running
         self.assertIsInstance(final_count, int)
     
     def test_environment_update(self):
-        """测试环境更新"""
+        """Test environment update"""
         initial_temp = self.engine.get_state().environment.temperature
         initial_ice = self.engine.get_state().environment.ice_coverage
         
         self.engine.step(100)
         
-        # 环境应该会更新
+        # Environment should be updated
         final_temp = self.engine.get_state().environment.temperature
         final_ice = self.engine.get_state().environment.ice_coverage
         
-        # 温度可能会变化（季节循环）
+        # Temperature may change (seasonal cycle)
         self.assertIsNotNone(final_temp)
         self.assertIsNotNone(final_ice)
     
     def test_animal_removal(self):
-        """测试死亡动物移除"""
-        # 手动设置一些动物能量为0
+        """Test dead animal removal"""
+        # Manually set some animal energy to 0
         state = self.engine.get_state()
         if len(state.penguins) > 0:
             state.penguins[0].energy = 0
         
         self.engine.tick()
         
-        # 死亡的动物应该被移除
+        # Dead animals should be removed
         new_state = self.engine.get_state()
         dead_penguins = [p for p in new_state.penguins if p.energy <= 0]
         self.assertEqual(len(dead_penguins), 0)

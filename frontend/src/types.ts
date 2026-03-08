@@ -9,7 +9,7 @@ export interface Animal {
   energy: number;
   age: number;
   max_energy: number;
-  state?: 'land' | 'sea';
+  state?: 'land' | 'sea' | 'flying' | 'grounded';
   behavior_state?: string; // idle, searching, targeting, fleeing
   is_juvenile?: boolean; // true if animal is still a juvenile
 }

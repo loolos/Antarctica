@@ -1,5 +1,5 @@
 /**
- * Seagull sprite renderer
+ * Seagull sprite renderer - flying vs grounded have distinct visuals
  */
 
 export interface SeagullSpriteOptions {
@@ -7,69 +7,124 @@ export interface SeagullSpriteOptions {
   y: number;
   energy: number;
   maxEnergy: number;
+  state?: 'flying' | 'grounded';
   facing?: 'left' | 'right';
   animationTime?: number;
 }
 
 export function drawSeagull(ctx: CanvasRenderingContext2D, options: SeagullSpriteOptions): void {
-  const { x, y, facing = 'right', animationTime = 0, energy, maxEnergy } = options;
-  const wingFlap = Math.sin(animationTime * Math.PI * 6) * 0.5;
-  const bob = Math.sin(animationTime * Math.PI * 2) * 1.2;
+  const { x, y, state = 'flying', facing = 'right', animationTime = 0, energy, maxEnergy } = options;
+  const isFlying = state === 'flying';
   const energyPercent = maxEnergy > 0 ? energy / maxEnergy : 1;
 
   ctx.save();
-  ctx.translate(x, y + bob);
+  ctx.translate(x, y);
 
   if (facing === 'left') {
     ctx.scale(-1, 1);
   }
 
-  // body
-  ctx.fillStyle = '#f5f7fa';
-  ctx.beginPath();
-  ctx.ellipse(0, 0, 10, 5, 0, 0, Math.PI * 2);
-  ctx.fill();
+  if (isFlying) {
+    // ===== FLYING POSE =====
+    const wingFlap = Math.sin(animationTime * Math.PI * 8) * 0.7;
+    const bob = Math.sin(animationTime * Math.PI * 3) * -4;
+    ctx.translate(0, bob);
 
-  // wing left
-  ctx.save();
-  ctx.translate(-2, -1);
-  ctx.rotate(-0.8 + wingFlap);
-  ctx.fillStyle = '#e6ebf2';
-  ctx.beginPath();
-  ctx.ellipse(-10, 0, 10, 2.3, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
+    // body (horizontal, flying)
+    ctx.fillStyle = '#f5f7fa';
+    ctx.beginPath();
+    ctx.ellipse(0, 0, 10, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
 
-  // wing right
-  ctx.save();
-  ctx.translate(2, -1);
-  ctx.rotate(0.8 - wingFlap);
-  ctx.fillStyle = '#e6ebf2';
-  ctx.beginPath();
-  ctx.ellipse(10, 0, 10, 2.3, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
+    // wings spread
+    ctx.save();
+    ctx.translate(-2, -1);
+    ctx.rotate(-0.8 + wingFlap);
+    ctx.fillStyle = '#dde4ef';
+    ctx.beginPath();
+    ctx.ellipse(-10, 0, 12, 2.3, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+    ctx.save();
+    ctx.translate(2, -1);
+    ctx.rotate(0.8 - wingFlap);
+    ctx.fillStyle = '#dde4ef';
+    ctx.beginPath();
+    ctx.ellipse(10, 0, 12, 2.3, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
 
-  // head
-  ctx.fillStyle = '#ffffff';
-  ctx.beginPath();
-  ctx.arc(-8, -2, 3, 0, Math.PI * 2);
-  ctx.fill();
+    // head
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(-8, -2, 3, 0, Math.PI * 2);
+    ctx.fill();
 
-  // beak
-  ctx.fillStyle = '#ffcc66';
-  ctx.beginPath();
-  ctx.moveTo(-10, -2);
-  ctx.lineTo(-14, -1.5);
-  ctx.lineTo(-10, -0.8);
-  ctx.closePath();
-  ctx.fill();
+    // beak
+    ctx.fillStyle = '#ffcc66';
+    ctx.beginPath();
+    ctx.moveTo(-10, -2);
+    ctx.lineTo(-14, -1.5);
+    ctx.lineTo(-10, -0.8);
+    ctx.closePath();
+    ctx.fill();
 
-  // eye
-  ctx.fillStyle = '#1b1b1b';
-  ctx.beginPath();
-  ctx.arc(-8.8, -2.4, 0.7, 0, Math.PI * 2);
-  ctx.fill();
+    // eye
+    ctx.fillStyle = '#1b1b1b';
+    ctx.beginPath();
+    ctx.arc(-8.8, -2.4, 0.7, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    // ===== STANDING POSE (grounded on land) =====
+    const idleBob = Math.sin(animationTime * Math.PI * 2) * 0.8;
+    ctx.translate(0, idleBob);
+
+    // body (more vertical/oval for standing bird)
+    ctx.fillStyle = '#f5f7fa';
+    ctx.beginPath();
+    ctx.ellipse(0, 2, 6, 8, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // wings folded at sides (small tucked wings)
+    ctx.fillStyle = '#e6ebf2';
+    ctx.beginPath();
+    ctx.ellipse(-5, 0, 4, 6, 0.3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(5, 0, 4, 6, -0.3, 0, Math.PI * 2);
+    ctx.fill();
+
+    // head (above body, more upright)
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(0, -6, 3.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // beak (pointing forward)
+    ctx.fillStyle = '#ffcc66';
+    ctx.beginPath();
+    ctx.moveTo(2, -6);
+    ctx.lineTo(8, -5.5);
+    ctx.lineTo(2, -5);
+    ctx.closePath();
+    ctx.fill();
+
+    // eye
+    ctx.fillStyle = '#1b1b1b';
+    ctx.beginPath();
+    ctx.arc(1.2, -6.8, 0.8, 0, Math.PI * 2);
+    ctx.fill();
+
+    // legs (standing)
+    ctx.strokeStyle = '#d4a84b';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(-2, 9);
+    ctx.lineTo(-2, 14);
+    ctx.moveTo(2, 9);
+    ctx.lineTo(2, 14);
+    ctx.stroke();
+  }
 
   // energy bar
   const barWidth = 18;
