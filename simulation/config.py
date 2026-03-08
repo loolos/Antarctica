@@ -15,6 +15,7 @@ class SimulationConfig:
     INITIAL_PENGUINS: int = 10
     INITIAL_SEALS: int = 5
     INITIAL_FISH: int = 50
+    INITIAL_SEAGULLS: int = 6
     
     # Penguin settings
     PENGUIN_MAX_ENERGY: float = 150.0

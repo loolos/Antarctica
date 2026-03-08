@@ -40,6 +40,7 @@ export interface WorldState {
   penguins: Animal[];
   seals: Animal[];
   fish: Animal[];
+  seagulls?: Animal[];
   environment: Environment;
 }
 

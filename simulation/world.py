@@ -3,7 +3,7 @@ World state definition
 """
 from dataclasses import dataclass, field
 from typing import List, Dict, Any
-from .animals import Penguin, Seal, Fish
+from .animals import Penguin, Seal, Fish, Seagull
 from .environment import Environment
 
 
@@ -14,6 +14,7 @@ class WorldState:
     penguins: List[Penguin] = field(default_factory=list)
     seals: List[Seal] = field(default_factory=list)
     fish: List[Fish] = field(default_factory=list)
+    seagulls: List[Seagull] = field(default_factory=list)
     environment: Environment = field(default_factory=Environment)
     
     def to_dict(self) -> Dict[str, Any]:
@@ -59,6 +60,20 @@ class WorldState:
                 }
                 for f in self.fish
             ],
+            "seagulls": [
+                {
+                    "id": g.id,
+                    "x": g.x,
+                    "y": g.y,
+                    "energy": g.energy,
+                    "age": g.age,
+                    "state": g.state,
+                    "max_energy": g.max_energy,
+                    "behavior_state": g.behavior_state,
+                    "is_juvenile": g.is_juvenile(),
+                }
+                for g in self.seagulls
+            ],
             "environment": {
                 "width": self.environment.width,
                 "height": self.environment.height,
@@ -76,5 +91,6 @@ class WorldState:
             "penguins": len(self.penguins),
             "seals": len(self.seals),
             "fish": len(self.fish),
+            "seagulls": len(self.seagulls),
         }
 

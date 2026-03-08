@@ -4,7 +4,7 @@ Antarctic ecosystem simulation core
 
 from .engine import SimulationEngine
 from .world import WorldState
-from .animals import Penguin, Seal, Fish
+from .animals import Penguin, Seal, Fish, Seagull
 from .environment import Environment
 
 __all__ = [
@@ -13,6 +13,7 @@ __all__ = [
     'Penguin',
     'Seal',
     'Fish',
+    'Seagull',
     'Environment',
 ]
 

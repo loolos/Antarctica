@@ -29,6 +29,7 @@ class TestIntegration(unittest.TestCase):
         self.assertIsInstance(state.penguins, list)
         self.assertIsInstance(state.seals, list)
         self.assertIsInstance(state.fish, list)
+        self.assertIsInstance(state.seagulls, list)
         
         # 验证环境参数
         self.assertGreaterEqual(state.environment.ice_coverage, 0)
@@ -62,6 +63,12 @@ class TestIntegration(unittest.TestCase):
                 self.assertLessEqual(fish.x, state.environment.width)
                 self.assertGreaterEqual(fish.y, 0)
                 self.assertLessEqual(fish.y, state.environment.height)
+
+            for seagull in state.seagulls:
+                self.assertGreaterEqual(seagull.x, 0)
+                self.assertLessEqual(seagull.x, state.environment.width)
+                self.assertGreaterEqual(seagull.y, 0)
+                self.assertLessEqual(seagull.y, state.environment.height)
     
     def test_json_serialization(self):
         """测试JSON序列化"""
@@ -94,7 +101,7 @@ class TestIntegration(unittest.TestCase):
         self.assertIsNotNone(state.environment)
         
         # 至少应该还有一些动物存活（除非全部被捕食）
-        total_animals = len(state.penguins) + len(state.seals) + len(state.fish)
+        total_animals = len(state.penguins) + len(state.seals) + len(state.fish) + len(state.seagulls)
         # 由于捕食关系，可能所有动物都死亡，这是正常的
         # 但系统不应该崩溃
         self.assertIsInstance(total_animals, int)

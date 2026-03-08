@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useCallback } from 'react';
 import { WorldState, AnimationState } from '../types';
-import { drawPenguin, drawSeal, drawFish } from '../sprites';
+import { drawPenguin, drawSeal, drawFish, drawSeagull } from '../sprites';
 
 interface SimulationCanvasProps {
   worldState: WorldState | null;
@@ -88,11 +88,31 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
       }
     });
 
+    // Update seagull animations
+    (worldState.seagulls || []).forEach((seagull) => {
+      const existing = animations.get(seagull.id);
+      if (existing) {
+        animations.set(seagull.id, {
+          ...existing,
+          targetX: seagull.x,
+          targetY: seagull.y,
+        });
+      } else {
+        animations.set(seagull.id, {
+          x: seagull.x,
+          y: seagull.y,
+          targetX: seagull.x,
+          targetY: seagull.y,
+        });
+      }
+    });
+
     // Remove animals that no longer exist
     const allIds = new Set([
       ...worldState.penguins.map((p) => p.id),
       ...worldState.seals.map((s) => s.id),
       ...worldState.fish.map((f) => f.id),
+      ...(worldState.seagulls || []).map((g) => g.id),
     ]);
 
     for (const [id] of animations) {
@@ -219,6 +239,34 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
       });
     });
 
+    // Draw seagulls with animated sprites
+    (state.seagulls || []).forEach((seagull) => {
+      const anim = anims.get(seagull.id);
+      if (!anim) return;
+
+      const lastPos = lastPositionsRef.current.get(seagull.id);
+      let facing: 'left' | 'right' = 'right';
+      if (lastPos) {
+        const dx = anim.x - lastPos.x;
+        if (Math.abs(dx) > 0.1) {
+          facing = dx > 0 ? 'right' : 'left';
+        }
+      }
+      lastPositionsRef.current.set(seagull.id, { x: anim.x, y: anim.y });
+
+      const currentTime = performance.now();
+      const animationTime = ((currentTime - animationStartTimeRef.current) * 0.001) % (Math.PI * 2);
+
+      drawSeagull(ctx, {
+        x: anim.x,
+        y: anim.y,
+        energy: seagull.energy,
+        maxEnergy: seagull.max_energy,
+        facing,
+        animationTime,
+      });
+    });
+
     // Draw penguins with pixel art sprites
     state.penguins.forEach((penguin) => {
       const anim = anims.get(penguin.id);
@@ -313,8 +361,9 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
     ctx.fillText(`Penguins: ${state.penguins.length}`, 10, 40);
     ctx.fillText(`Seals: ${state.seals.length}`, 10, 60);
     ctx.fillText(`Fish: ${state.fish.length}`, 10, 80);
-    ctx.fillText(`Temperature: ${state.environment.temperature.toFixed(1)}°C`, 10, 100);
-    ctx.fillText(`Season: ${(state.environment.season / 1000).toFixed(1)}`, 10, 120);
+    ctx.fillText(`Seagulls: ${(state.seagulls || []).length}`, 10, 100);
+    ctx.fillText(`Temperature: ${state.environment.temperature.toFixed(1)}°C`, 10, 120);
+    ctx.fillText(`Season: ${(state.environment.season / 1000).toFixed(1)}`, 10, 140);
   }, [width, height]);
 
   // Animation loop (60fps interpolation)
