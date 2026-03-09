@@ -14,7 +14,7 @@ time step in the simulation. During each tick:
 import random
 import math
 from typing import List, Optional, Tuple
-from .world import WorldState
+from .world import WorldState, FloeFish
 from .animals import Penguin, Seal, Fish, Seagull, Animal
 from .environment import Environment
 from .config import get_config
@@ -288,6 +288,10 @@ class SimulationEngine:
         for seagull in self.world.seagulls:
             seagull.tick()
             self._move_animal(seagull)
+
+        # Update fish dropped on ice floes
+        for floe_fish in self.world.floe_fish:
+            floe_fish.tick()
     
     def _move_animal(self, animal):
         """Move animal with physics and AI"""
@@ -336,8 +340,13 @@ class SimulationEngine:
         elif isinstance(animal, Seagull):
             config = get_config()
             energy_percent = animal.energy / animal.max_energy
+            # Carrying fish has highest landing priority: return to floe before eating.
+            if animal.carrying_fish:
+                needs_land = True
+                if animal.state == "flying":
+                    animal.behavior_state = "carrying_to_land"
             # Seagull: when energy > 90%, go to ice floe to socialize/breed
-            if energy_percent > config.ENERGY_THRESHOLD_HIGH:
+            elif energy_percent > config.ENERGY_THRESHOLD_HIGH:
                 needs_land = True
             # When flying + idle: must go to land (idle only when grounded)
             elif animal.state == "flying" and animal.behavior_state == "idle":
@@ -364,6 +373,9 @@ class SimulationEngine:
                         dx, dy = 0, 0
                 if is_on_land:
                     animal.state = "grounded"
+                    if animal.carrying_fish and animal.prey_processing_ticks <= 0:
+                        animal.behavior_state = "processing_prey"
+                        animal.prey_processing_ticks = config.SEAGULL_PREY_PROCESSING_TICKS
             else:
                 # Penguin/Seal: go to nearest ice floe
                 floes = self.world.environment.ice_floes
@@ -376,6 +388,10 @@ class SimulationEngine:
         if isinstance(animal, Seagull) and animal.state == "grounded":
             threats = [t for t in (list(self.world.seals) + list(self.world.penguins)) if t.is_alive()]
             config = get_config()
+            if animal.carrying_fish and animal.behavior_state != "processing_prey":
+                animal.behavior_state = "processing_prey"
+                if animal.prey_processing_ticks <= 0:
+                    animal.prey_processing_ticks = config.SEAGULL_PREY_PROCESSING_TICKS
             # Use linear search for accurate distances (spatial grid may have stale positions)
             nearest_threat = None
             min_dist = config.SEAGULL_FLEE_RANGE_GROUNDED
@@ -385,6 +401,9 @@ class SimulationEngine:
                     min_dist = d
                     nearest_threat = t
             if nearest_threat and animal.behavior_state != "fleeing":
+                # While processing prey on floe, any close threat forces prey drop.
+                if animal.carrying_fish:
+                    self._drop_seagull_fish(animal)
                 animal.state = "flying"
                 animal.behavior_state = "fleeing"
                 animal.flee_cooldown = config.FLEE_COOLDOWN_TICKS
@@ -415,11 +434,29 @@ class SimulationEngine:
                     animal.behavior_state = "idle"
                 animal.hunt_direction_ticks = 0
 
+            # Grounded with fish and no immediate flee: keep processing countdown.
+            if animal.carrying_fish and animal.behavior_state == "processing_prey" and animal.state == "grounded":
+                dx, dy = 0, 0
+                if animal.prey_processing_ticks > 0:
+                    animal.prey_processing_ticks -= 1
+                if animal.prey_processing_ticks <= 0:
+                    animal.carrying_fish = False
+                    animal.prey_processing_ticks = 0
+                    animal.gain_energy(config.SEAGULL_ENERGY_RECOVERY_FISH)
+                    animal.hunting_cooldown = config.HUNTING_COOLDOWN_TICKS
+                    animal.behavior_state = "idle"
+
         # 1.5. Update behavior state based on energy (BEFORE social so searching overrides grouping)
         if isinstance(animal, (Penguin, Seal, Seagull)):
             energy_percent = animal.energy / animal.max_energy
             config = get_config()
-            if energy_percent < config.ENERGY_THRESHOLD_HUNTING and energy_percent <= config.ENERGY_THRESHOLD_HIGH and animal.behavior_state not in ["fleeing", "targeting"] and animal.hunting_cooldown == 0:
+            is_seagull_locked_prey_flow = (
+                isinstance(animal, Seagull) and
+                (animal.carrying_fish or animal.behavior_state in ["carrying_to_land", "processing_prey"])
+            )
+            if is_seagull_locked_prey_flow:
+                pass
+            elif energy_percent < config.ENERGY_THRESHOLD_HUNTING and energy_percent <= config.ENERGY_THRESHOLD_HIGH and animal.behavior_state not in ["fleeing", "targeting"] and animal.hunting_cooldown == 0:
                 if animal.behavior_state != "searching":
                     animal.behavior_state = "searching"
                     animal.hunt_direction_angle = random.uniform(0, 2 * math.pi)
@@ -435,7 +472,8 @@ class SimulationEngine:
         # 1b. Social behavior - skip when searching (searching has higher priority)
         # Seagull: when grounded and energy > 90%, socialize with other grounded seagulls
         if isinstance(animal, Seagull) and dx == 0 and dy == 0 and animal.state == "grounded" and \
-           animal.behavior_state not in ["fleeing", "targeting", "searching"]:
+           animal.behavior_state not in ["fleeing", "targeting", "searching", "processing_prey"] and \
+           not animal.carrying_fish:
             config = get_config()
             energy_percent = animal.energy / animal.max_energy
             if energy_percent > config.ENERGY_THRESHOLD_HIGH:
@@ -629,7 +667,7 @@ class SimulationEngine:
                     animal.hunt_direction_ticks = 0
         
         # 2.5. Seagull searching - same pattern as penguin/seal (fly one direction 2-3 sec, then turn), just faster
-        if not target and isinstance(animal, Seagull) and animal.behavior_state == "searching" and animal.hunting_cooldown == 0:
+        if not target and isinstance(animal, Seagull) and not animal.carrying_fish and animal.behavior_state == "searching" and animal.hunting_cooldown == 0:
             energy_percent = animal.energy / animal.max_energy
             config = get_config()
             if energy_percent <= config.ENERGY_THRESHOLD_HIGH:
@@ -656,7 +694,7 @@ class SimulationEngine:
                     animal.hunt_direction_ticks = 0
 
         # 2.6. Seagull targeting fish
-        if not target and isinstance(animal, Seagull) and animal.behavior_state == "targeting":
+        if not target and isinstance(animal, Seagull) and not animal.carrying_fish and animal.behavior_state == "targeting":
             target_fish = None
             for f in self.world.fish:
                 if f.is_alive() and f.id == animal.target_id:
@@ -683,8 +721,14 @@ class SimulationEngine:
             # Don't search if energy > high threshold (should be socializing on land instead)
             config = get_config()
             if energy_percent <= config.ENERGY_THRESHOLD_HIGH:
+                # On floes, searching penguins/seals will opportunistically approach dropped fish.
+                floe_fish_target = self._find_nearest_floe_fish(animal, max_distance=config.PREY_SEARCH_RANGE) if is_on_land else None
+                if floe_fish_target is not None:
+                    target = floe_fish_target
+                    dx = floe_fish_target.x - animal.x
+                    dy = floe_fish_target.y - animal.y
                 # On land with energy < 60%: go straight toward sea (until in water)
-                if is_on_land and energy_percent < config.ENERGY_THRESHOLD_HUNTING:
+                elif is_on_land and energy_percent < config.ENERGY_THRESHOLD_HUNTING:
                     # Seal: first check for very close penguin to hunt
                     nearby_penguin = None
                     if isinstance(animal, Seal):
@@ -762,7 +806,7 @@ class SimulationEngine:
                     dy = math.sin(animal.hunt_direction_angle) * search_distance
                 
                 # Check for prey while searching (only when in sea, or seal targeting penguin already handled above)
-                if not (is_on_land and energy_percent < config.ENERGY_THRESHOLD_HUNTING):
+                if target is None and not (is_on_land and energy_percent < config.ENERGY_THRESHOLD_HUNTING):
                     prey_type = None
                     if isinstance(animal, Penguin) and animal.state == "sea":
                         prey_type = Fish
@@ -1010,7 +1054,9 @@ class SimulationEngine:
         
         # 4. Active Exploration (if no other drive, for Penguins, Seals, Seagulls)
         if dx == 0 and dy == 0:
-            if isinstance(animal, (Penguin, Seal, Seagull)):
+            if isinstance(animal, (Penguin, Seal, Seagull)) and not (
+                isinstance(animal, Seagull) and animal.carrying_fish and animal.state == "grounded"
+            ):
                 # Seagull flying: explore entire map. Grounded: explore floe.
                 explore_on_land = is_on_land if not isinstance(animal, Seagull) else (animal.state == "grounded" and is_on_land)
                 # On land (or grounded on floe), explore the ice floe; in sea (or flying), explore
@@ -1291,6 +1337,35 @@ class SimulationEngine:
         dy = math.sin(current_angle) * original_dist
         
         return dx, dy
+
+    def _drop_seagull_fish(self, seagull: Seagull):
+        """Drop a carried fish on current floe position."""
+        if not seagull.carrying_fish:
+            return
+        config = get_config()
+        dropped = FloeFish(
+            id=f"floe_fish_{self.world.tick}_{random.randint(1000, 9999)}",
+            x=seagull.x,
+            y=seagull.y,
+            ttl_ticks=config.SEAGULL_PREY_DROP_TTL_TICKS,
+        )
+        self.world.floe_fish.append(dropped)
+        seagull.carrying_fish = False
+        seagull.prey_processing_ticks = 0
+        seagull.target_id = ""
+
+    def _find_nearest_floe_fish(self, animal: Animal, max_distance: float) -> Optional[FloeFish]:
+        """Find nearest dropped floe fish within range."""
+        nearest = None
+        min_dist = max_distance
+        for floe_fish in self.world.floe_fish:
+            if not floe_fish.is_available():
+                continue
+            dist = math.sqrt((animal.x - floe_fish.x) ** 2 + (animal.y - floe_fish.y) ** 2)
+            if dist < min_dist:
+                min_dist = dist
+                nearest = floe_fish
+        return nearest
     
     def _find_nearest(
         self, 
@@ -1380,6 +1455,38 @@ class SimulationEngine:
                         seal.behavior_state = "idle"
                         seal.hunt_direction_ticks = 0
                     break
+
+        # Penguins/Seals scavenge fish dropped on ice floes while searching on land.
+        for floe_fish in self.world.floe_fish[:]:
+            eaten = False
+
+            for penguin in self.world.penguins[:]:
+                if not penguin.is_alive() or penguin.state != "land" or penguin.behavior_state != "searching":
+                    continue
+                if math.sqrt((penguin.x - floe_fish.x) ** 2 + (penguin.y - floe_fish.y) ** 2) < 6:
+                    config = get_config()
+                    penguin.gain_energy(config.PENGUIN_ENERGY_RECOVERY_FISH)
+                    penguin.hunting_cooldown = config.HUNTING_COOLDOWN_TICKS
+                    penguin.behavior_state = "idle"
+                    penguin.hunt_direction_ticks = 0
+                    self.world.floe_fish.remove(floe_fish)
+                    eaten = True
+                    break
+
+            if eaten:
+                continue
+
+            for seal in self.world.seals[:]:
+                if not seal.is_alive() or seal.state != "land" or seal.behavior_state != "searching":
+                    continue
+                if math.sqrt((seal.x - floe_fish.x) ** 2 + (seal.y - floe_fish.y) ** 2) < 8:
+                    config = get_config()
+                    seal.gain_energy(config.SEAL_ENERGY_RECOVERY_FISH)
+                    seal.hunting_cooldown = config.HUNTING_COOLDOWN_TICKS
+                    seal.behavior_state = "idle"
+                    seal.hunt_direction_ticks = 0
+                    self.world.floe_fish.remove(floe_fish)
+                    break
         
         # Seals eat fish
         for seal in self.world.seals[:]:
@@ -1442,24 +1549,21 @@ class SimulationEngine:
                         penguin.hunt_direction_ticks = 0
                     break
 
-        # Seagulls eat fish (flying or grounded, when close)
+        # Seagulls catch fish in sea, then must carry prey to ice floe before eating.
         for seagull in self.world.seagulls[:]:
-            if not seagull.is_alive():
+            if not seagull.is_alive() or seagull.carrying_fish or seagull.state != "flying":
                 continue
             for fish in self.world.fish[:]:
                 if not fish.is_alive():
                     continue
                 if seagull.distance_to(fish) < 8:
-                    config = get_config()
-                    seagull.gain_energy(config.SEAGULL_ENERGY_RECOVERY_FISH)
                     self.spatial_grid.remove(fish)
                     self.world.fish.remove(fish)
-                    seagull.hunting_cooldown = config.HUNTING_COOLDOWN_TICKS
-                    if seagull.behavior_state == "targeting":
-                        seagull.target_id = ""
-                    if seagull.behavior_state in ["searching", "targeting"]:
-                        seagull.behavior_state = "idle"
-                        seagull.hunt_direction_ticks = 0
+                    seagull.carrying_fish = True
+                    seagull.prey_processing_ticks = 0
+                    seagull.behavior_state = "carrying_to_land"
+                    seagull.target_id = ""
+                    seagull.hunt_direction_ticks = 0
                     break
     
     def _handle_breeding(self):
@@ -1575,6 +1679,9 @@ class SimulationEngine:
         for seagull in dead_seagulls:
             self.spatial_grid.remove(seagull)
         self.world.seagulls = [g for g in self.world.seagulls if g.is_alive()]
+
+        # Remove expired floe fish
+        self.world.floe_fish = [f for f in self.world.floe_fish if f.is_available()]
     
     def get_state(self) -> WorldState:
         """

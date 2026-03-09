@@ -39,6 +39,9 @@ class SimulationConfig:
     SEAGULL_FLEE_RANGE_GROUNDED: float = 80.0  # When grounded: flee if penguin/seal within this range
     SEAGULL_HUNTING_DIRECTION_TICKS_MIN: int = 10  # 2 seconds at 5 ticks/sec - fly in one direction
     SEAGULL_HUNTING_DIRECTION_TICKS_MAX: int = 30  # 6 seconds - then random turn (same pattern as penguin/seal, shorter)
+    SEAGULL_CARRYING_ENERGY_MULTIPLIER: float = 1.3  # Carrying fish costs 1.3x normal flying energy
+    SEAGULL_PREY_PROCESSING_TICKS: int = 20  # Time on floe before fish can be eaten
+    SEAGULL_PREY_DROP_TTL_TICKS: int = 120  # Dropped floe fish expires if nobody eats it
     
     # Behavior settings
     FLEE_COOLDOWN_TICKS: int = 15  # 3 seconds at 5 ticks/sec
