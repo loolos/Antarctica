@@ -326,6 +326,17 @@ class TestSimulationEngine(unittest.TestCase):
         self.engine._move_animal(seal)
         self.assertGreater(seal.x, old_x)
 
+    def test_search_range_is_dynamic_with_medium_speed(self):
+        """Search range should be larger in faster medium for the same animal."""
+        penguin = Penguin(id="p_speed", x=100.0, y=100.0, energy=80.0, state="land")
+        penguin.age = 200  # adult
+        base_range = 200.0
+
+        land_range = self.engine._get_speed_adjusted_search_range(penguin, is_on_land=True, base_range=base_range)
+        sea_range = self.engine._get_speed_adjusted_search_range(penguin, is_on_land=False, base_range=base_range)
+
+        self.assertGreater(sea_range, land_range)
+
     def test_seal_on_floe_drops_far_penguin_target_with_reduced_tracking_range(self):
         """Seal on floe should stop tracking a land penguin that is beyond reduced range."""
         self.engine.world.environment.ice_floes = [{
