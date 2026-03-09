@@ -74,6 +74,10 @@ class SimulationConfig:
     MAX_TRACKING_DISTANCE: float = 400.0  # Maximum distance before giving up tracking
     PREY_SEARCH_RANGE: float = 200.0  # Search range for prey
     SEAL_LAND_PENGUIN_HUNT_RANGE: float = 80.0  # Seal on land: hunt penguin only if within this (very close)
+    SEAL_FLOE_PREY_SEARCH_MULTIPLIER: float = 0.5  # Seal on floe: 50% prey search/tracking range (slow movement on ice)
+    SEARCH_RANGE_SPEED_BASE: float = 3.0  # Baseline speed used to scale search range dynamically
+    SEARCH_RANGE_SPEED_FACTOR_MIN: float = 0.5  # Clamp: minimum dynamic search range factor
+    SEARCH_RANGE_SPEED_FACTOR_MAX: float = 1.8  # Clamp: maximum dynamic search range factor
     PREY_EXPLORATION_RANGE: float = 600.0  # Exploration range for regular hunting
     SEA_SEARCH_AVOID_FLOE_RANGE: float = 150.0  # In sea searching: if within this of floe center, prefer swimming away
     

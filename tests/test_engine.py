@@ -326,6 +326,39 @@ class TestSimulationEngine(unittest.TestCase):
         self.engine._move_animal(seal)
         self.assertGreater(seal.x, old_x)
 
+    def test_search_range_is_dynamic_with_medium_speed(self):
+        """Search range should be larger in faster medium for the same animal."""
+        penguin = Penguin(id="p_speed", x=100.0, y=100.0, energy=80.0, state="land")
+        penguin.age = 200  # adult
+        base_range = 200.0
+
+        land_range = self.engine._get_speed_adjusted_search_range(penguin, is_on_land=True, base_range=base_range)
+        sea_range = self.engine._get_speed_adjusted_search_range(penguin, is_on_land=False, base_range=base_range)
+
+        self.assertGreater(sea_range, land_range)
+
+    def test_seal_on_floe_drops_far_penguin_target_with_reduced_tracking_range(self):
+        """Seal on floe should stop tracking a land penguin that is beyond reduced range."""
+        self.engine.world.environment.ice_floes = [{
+            'x': 400.0, 'y': 300.0, 'radius': 320.0,
+            'shape': 'circle', 'radius_x': 320.0, 'radius_y': 320.0, 'rotation': 0
+        }]
+        seal = Seal(id="s_track", x=300.0, y=300.0, energy=30.0, state="land")
+        seal.behavior_state = "targeting"
+        seal.target_id = "p_far"
+        penguin = Penguin(id="p_far", x=550.0, y=300.0, energy=80.0, state="land")  # distance=250 (> 200 reduced range)
+
+        self.engine.world.penguins = [penguin]
+        self.engine.world.seals = [seal]
+        self.engine.world.seagulls = []
+        self.engine.world.fish = []
+        self.engine.world.floe_fish = []
+
+        self.engine._move_animal(seal)
+
+        self.assertEqual(seal.target_id, "")
+        self.assertEqual(seal.behavior_state, "searching")
+
     def test_grounded_processing_seagull_stays_put_without_threat(self):
         """Seagull processing prey should remain stationary unless threat appears."""
         self.engine.world.environment.ice_floes = [{
