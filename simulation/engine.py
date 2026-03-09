@@ -204,6 +204,11 @@ class SimulationEngine:
         
         # Update environment
         self.world.environment.tick()
+
+        # Keep spatial index aligned with the latest world lists/positions.
+        # This avoids missed nearby-detection when entities were repositioned
+        # externally or moved across grid cells in previous ticks.
+        self._rebuild_spatial_grid()
         
         # Update all animals
         self._update_animals()
@@ -292,6 +297,18 @@ class SimulationEngine:
         # Update fish dropped on ice floes
         for floe_fish in self.world.floe_fish:
             floe_fish.tick()
+
+    def _rebuild_spatial_grid(self):
+        """Rebuild spatial index from current world state."""
+        self.spatial_grid.clear()
+        for animal in self.world.penguins:
+            self.spatial_grid.add(animal)
+        for animal in self.world.seals:
+            self.spatial_grid.add(animal)
+        for animal in self.world.fish:
+            self.spatial_grid.add(animal)
+        for animal in self.world.seagulls:
+            self.spatial_grid.add(animal)
     
     def _move_animal(self, animal):
         """Move animal with physics and AI"""
@@ -326,6 +343,7 @@ class SimulationEngine:
         # 2. AI Decision Making
         dx, dy = 0, 0
         target = None
+        seagull_processing_locked = False
         
         # Priorities:
         # 1. Breeding/Resting/Social (if needed and not on land)
@@ -436,6 +454,7 @@ class SimulationEngine:
 
             # Grounded with fish and no immediate flee: keep processing countdown.
             if animal.carrying_fish and animal.behavior_state == "processing_prey" and animal.state == "grounded":
+                seagull_processing_locked = True
                 dx, dy = 0, 0
                 if animal.prey_processing_ticks > 0:
                     animal.prey_processing_ticks -= 1
@@ -471,7 +490,7 @@ class SimulationEngine:
 
         # 1b. Social behavior - skip when searching (searching has higher priority)
         # Seagull: when grounded and energy > 90%, socialize with other grounded seagulls
-        if isinstance(animal, Seagull) and dx == 0 and dy == 0 and animal.state == "grounded" and \
+        if isinstance(animal, Seagull) and not seagull_processing_locked and dx == 0 and dy == 0 and animal.state == "grounded" and \
            animal.behavior_state not in ["fleeing", "targeting", "searching", "processing_prey"] and \
            not animal.carrying_fish:
             config = get_config()
@@ -667,7 +686,7 @@ class SimulationEngine:
                     animal.hunt_direction_ticks = 0
         
         # 2.5. Seagull searching - same pattern as penguin/seal (fly one direction 2-3 sec, then turn), just faster
-        if not target and isinstance(animal, Seagull) and not animal.carrying_fish and animal.behavior_state == "searching" and animal.hunting_cooldown == 0:
+        if not seagull_processing_locked and not target and isinstance(animal, Seagull) and not animal.carrying_fish and animal.behavior_state == "searching" and animal.hunting_cooldown == 0:
             energy_percent = animal.energy / animal.max_energy
             config = get_config()
             if energy_percent <= config.ENERGY_THRESHOLD_HIGH:
@@ -694,7 +713,7 @@ class SimulationEngine:
                     animal.hunt_direction_ticks = 0
 
         # 2.6. Seagull targeting fish
-        if not target and isinstance(animal, Seagull) and not animal.carrying_fish and animal.behavior_state == "targeting":
+        if not seagull_processing_locked and not target and isinstance(animal, Seagull) and not animal.carrying_fish and animal.behavior_state == "targeting":
             target_fish = None
             for f in self.world.fish:
                 if f.is_alive() and f.id == animal.target_id:
@@ -722,11 +741,15 @@ class SimulationEngine:
             config = get_config()
             if energy_percent <= config.ENERGY_THRESHOLD_HIGH:
                 # On floes, searching penguins/seals will opportunistically approach dropped fish.
-                floe_fish_target = self._find_nearest_floe_fish(animal, max_distance=config.PREY_SEARCH_RANGE) if is_on_land else None
-                if floe_fish_target is not None:
-                    target = floe_fish_target
-                    dx = floe_fish_target.x - animal.x
-                    dy = floe_fish_target.y - animal.y
+                # Land scavenging unified behavior:
+                # - approach nearest dropped floe fish
+                # - or approach a grounded seagull currently processing prey
+                # (likely to trigger a flee+drop event nearby).
+                land_food_target = self._find_nearest_land_food_source(animal, max_distance=config.PREY_SEARCH_RANGE) if is_on_land else None
+                if land_food_target is not None:
+                    target = land_food_target
+                    dx = land_food_target.x - animal.x
+                    dy = land_food_target.y - animal.y
                 # On land with energy < 60%: go straight toward sea (until in water)
                 elif is_on_land and energy_percent < config.ENERGY_THRESHOLD_HUNTING:
                     # Seal: first check for very close penguin to hunt
@@ -1054,77 +1077,80 @@ class SimulationEngine:
         
         # 4. Active Exploration (if no other drive, for Penguins, Seals, Seagulls)
         if dx == 0 and dy == 0:
-            if isinstance(animal, (Penguin, Seal, Seagull)) and not (
-                isinstance(animal, Seagull) and animal.carrying_fish and animal.state == "grounded"
-            ):
-                # Seagull flying: explore entire map. Grounded: explore floe.
-                explore_on_land = is_on_land if not isinstance(animal, Seagull) else (animal.state == "grounded" and is_on_land)
-                # On land (or grounded on floe), explore the ice floe; in sea (or flying), explore
-                if explore_on_land:
-                    # Explore within the current ice floe or move to edge to go to sea
-                    # Find current floe
-                    current_floe = None
-                    for floe in self.world.environment.ice_floes:
-                        dist_sq = (animal.x - floe['x'])**2 + (animal.y - floe['y'])**2
-                        if dist_sq <= floe['radius']**2:
-                            current_floe = floe
-                            break
-                    
-                    if current_floe:
-                        # Explore within the ice floe - move around actively
-                        # Choose a random point within the floe to explore
-                        angle = random.uniform(0, 2 * math.pi)
-                        # Move a good distance within the floe (30-60% of radius)
-                        exploration_distance = current_floe['radius'] * random.uniform(0.3, 0.6)
-                        target_x = current_floe['x'] + math.cos(angle) * exploration_distance
-                        target_y = current_floe['y'] + math.sin(angle) * exploration_distance
+            if isinstance(animal, (Penguin, Seal, Seagull)):
+                if not (
+                    isinstance(animal, Seagull) and (
+                        (animal.carrying_fish and animal.state == "grounded") or seagull_processing_locked
+                    )
+                ):
+                    # Seagull flying: explore entire map. Grounded: explore floe.
+                    explore_on_land = is_on_land if not isinstance(animal, Seagull) else (animal.state == "grounded" and is_on_land)
+                    # On land (or grounded on floe), explore the ice floe; in sea (or flying), explore
+                    if explore_on_land:
+                        # Explore within the current ice floe or move to edge to go to sea
+                        # Find current floe
+                        current_floe = None
+                        for floe in self.world.environment.ice_floes:
+                            dist_sq = (animal.x - floe['x'])**2 + (animal.y - floe['y'])**2
+                            if dist_sq <= floe['radius']**2:
+                                current_floe = floe
+                                break
                         
-                        # Move towards that point
-                        dx = target_x - animal.x
-                        dy = target_y - animal.y
-                        
-                        # Ensure minimum movement distance
-                        if abs(dx) < 10 and abs(dy) < 10:
-                            # Too small, add more exploration
-                            angle2 = random.uniform(0, 2 * math.pi)
-                            additional_dist = 20 + random.uniform(0, 30)
-                            dx += math.cos(angle2) * additional_dist
-                            dy += math.sin(angle2) * additional_dist
+                        if current_floe:
+                            # Explore within the ice floe - move around actively
+                            # Choose a random point within the floe to explore
+                            angle = random.uniform(0, 2 * math.pi)
+                            # Move a good distance within the floe (30-60% of radius)
+                            exploration_distance = current_floe['radius'] * random.uniform(0.3, 0.6)
+                            target_x = current_floe['x'] + math.cos(angle) * exploration_distance
+                            target_y = current_floe['y'] + math.sin(angle) * exploration_distance
+                            
+                            # Move towards that point
+                            dx = target_x - animal.x
+                            dy = target_y - animal.y
+                            
+                            # Ensure minimum movement distance
+                            if abs(dx) < 10 and abs(dy) < 10:
+                                # Too small, add more exploration
+                                angle2 = random.uniform(0, 2 * math.pi)
+                                additional_dist = 20 + random.uniform(0, 30)
+                                dx += math.cos(angle2) * additional_dist
+                                dy += math.sin(angle2) * additional_dist
+                        else:
+                            # Not on a floe (shouldn't happen), but handle it with active exploration
+                            angle = random.uniform(0, 2 * math.pi)
+                            exploration_distance = 30 + random.uniform(0, 50)
+                            dx = math.cos(angle) * exploration_distance
+                            dy = math.sin(angle) * exploration_distance
                     else:
-                        # Not on a floe (shouldn't happen), but handle it with active exploration
-                        angle = random.uniform(0, 2 * math.pi)
-                        exploration_distance = 30 + random.uniform(0, 50)
-                        dx = math.cos(angle) * exploration_distance
-                        dy = math.sin(angle) * exploration_distance
-                else:
-                    # In sea (or flying for seagull): explore - same direction persistence as searching
-                    # Walk one direction for a few seconds, then randomly change
-                    config = get_config()
-                    if animal.hunt_direction_ticks <= 0:
-                        animal.hunt_direction_ticks = random.randint(config.HUNTING_DIRECTION_TICKS_MIN, config.HUNTING_DIRECTION_TICKS_MAX)
-                        # If too close to floe, prefer swimming away (same as searching)
-                        if isinstance(animal, (Penguin, Seal)):
-                            nearest_floe = None
-                            min_dist = float('inf')
-                            for floe in self.world.environment.ice_floes:
-                                dist = math.sqrt((animal.x - floe['x'])**2 + (animal.y - floe['y'])**2)
-                                if dist < min_dist:
-                                    min_dist = dist
-                                    nearest_floe = floe
-                            if nearest_floe and min_dist < config.SEA_SEARCH_AVOID_FLOE_RANGE:
-                                away_dx = animal.x - nearest_floe['x']
-                                away_dy = animal.y - nearest_floe['y']
-                                away_angle = math.atan2(away_dy, away_dx)
-                                animal.hunt_direction_angle = away_angle + random.uniform(-0.785398, 0.785398)
-                                animal.hunt_direction_angle = animal.hunt_direction_angle % (2 * math.pi)
+                        # In sea (or flying for seagull): explore - same direction persistence as searching
+                        # Walk one direction for a few seconds, then randomly change
+                        config = get_config()
+                        if animal.hunt_direction_ticks <= 0:
+                            animal.hunt_direction_ticks = random.randint(config.HUNTING_DIRECTION_TICKS_MIN, config.HUNTING_DIRECTION_TICKS_MAX)
+                            # If too close to floe, prefer swimming away (same as searching)
+                            if isinstance(animal, (Penguin, Seal)):
+                                nearest_floe = None
+                                min_dist = float('inf')
+                                for floe in self.world.environment.ice_floes:
+                                    dist = math.sqrt((animal.x - floe['x'])**2 + (animal.y - floe['y'])**2)
+                                    if dist < min_dist:
+                                        min_dist = dist
+                                        nearest_floe = floe
+                                if nearest_floe and min_dist < config.SEA_SEARCH_AVOID_FLOE_RANGE:
+                                    away_dx = animal.x - nearest_floe['x']
+                                    away_dy = animal.y - nearest_floe['y']
+                                    away_angle = math.atan2(away_dy, away_dx)
+                                    animal.hunt_direction_angle = away_angle + random.uniform(-0.785398, 0.785398)
+                                    animal.hunt_direction_angle = animal.hunt_direction_angle % (2 * math.pi)
+                                else:
+                                    animal.hunt_direction_angle = random.uniform(0, 2 * math.pi)
                             else:
                                 animal.hunt_direction_angle = random.uniform(0, 2 * math.pi)
-                        else:
-                            animal.hunt_direction_angle = random.uniform(0, 2 * math.pi)
-                    animal.hunt_direction_ticks -= 1
-                    exploration_distance = 50 + random.uniform(0, 100)  # 50-150 units
-                    dx = math.cos(animal.hunt_direction_angle) * exploration_distance
-                    dy = math.sin(animal.hunt_direction_angle) * exploration_distance
+                        animal.hunt_direction_ticks -= 1
+                        exploration_distance = 50 + random.uniform(0, 100)  # 50-150 units
+                        dx = math.cos(animal.hunt_direction_angle) * exploration_distance
+                        dy = math.sin(animal.hunt_direction_angle) * exploration_distance
             else:
                 # Fish: smaller random movement
                 dx = random.uniform(-10, 10)
@@ -1168,6 +1194,7 @@ class SimulationEngine:
         
         # Apply movement and check for boundary collision
         hit_boundary = animal.move(dx, dy, self.world.environment.width, self.world.environment.height)
+        self.spatial_grid.update(animal)
         
         # Handle boundary collisions - when fleeing, direction is already fixed for 3 seconds
         # No need to change direction when hitting boundary during fleeing (direction won't change)
@@ -1366,6 +1393,39 @@ class SimulationEngine:
                 min_dist = dist
                 nearest = floe_fish
         return nearest
+
+    def _find_nearest_feeding_seagull(self, animal: Animal, max_distance: float) -> Optional[Seagull]:
+        """Find nearest grounded seagull that is actively processing prey."""
+        nearest = None
+        min_dist = max_distance
+        for seagull in self.world.seagulls:
+            if not seagull.is_alive():
+                continue
+            if seagull.state != "grounded":
+                continue
+            if seagull.behavior_state != "processing_prey":
+                continue
+            if not seagull.carrying_fish:
+                continue
+            dist = animal.distance_to(seagull)
+            if dist < min_dist:
+                min_dist = dist
+                nearest = seagull
+        return nearest
+
+    def _find_nearest_land_food_source(self, animal: Animal, max_distance: float):
+        """Return nearest land food source: dropped fish or feeding seagull."""
+        floe_fish = self._find_nearest_floe_fish(animal, max_distance=max_distance)
+        feeding_seagull = self._find_nearest_feeding_seagull(animal, max_distance=max_distance)
+
+        if floe_fish is None:
+            return feeding_seagull
+        if feeding_seagull is None:
+            return floe_fish
+
+        fish_dist = math.sqrt((animal.x - floe_fish.x) ** 2 + (animal.y - floe_fish.y) ** 2)
+        seagull_dist = animal.distance_to(feeding_seagull)
+        return floe_fish if fish_dist <= seagull_dist else feeding_seagull
     
     def _find_nearest(
         self, 
@@ -1395,13 +1455,15 @@ class SimulationEngine:
         """
         # Use spatial grid optimization if max_distance is limited
         if max_distance < float('inf') and targets:
-            return self.spatial_grid.find_nearest(
+            nearest = self.spatial_grid.find_nearest(
                 animal.x,
                 animal.y,
                 targets,
                 max_distance=max_distance,
                 exclude=animal
             )
+            if nearest is not None:
+                return nearest
         
         # Fallback to linear search for unlimited distance
         nearest = None

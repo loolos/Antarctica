@@ -8,7 +8,7 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from simulation.engine import SimulationEngine
-from simulation.animals import Penguin, Seagull, Fish
+from simulation.animals import Penguin, Seal, Seagull, Fish
 from simulation.world import FloeFish
 
 
@@ -212,6 +212,108 @@ class TestSimulationEngine(unittest.TestCase):
         self.assertEqual(len(self.engine.world.floe_fish), 0)
         self.assertGreater(penguin.energy, 20.0)
         self.assertEqual(penguin.behavior_state, "idle")
+
+    def test_penguin_flees_nearby_seal_even_with_stale_spatial_cell(self):
+        """Penguin on floe should still enter fleeing when a seal is close."""
+        self.engine.world.environment.ice_floes = [{
+            'x': 200.0, 'y': 200.0, 'radius': 120.0,
+            'shape': 'circle', 'radius_x': 120.0, 'radius_y': 120.0, 'rotation': 0
+        }]
+        penguin = Penguin(id="p_flee", x=200.0, y=200.0, energy=80.0, state="land")
+        seal = Seal(id="s_near", x=700.0, y=500.0, energy=120.0, state="land")
+
+        self.engine.world.penguins = [penguin]
+        self.engine.world.seals = [seal]
+        self.engine.world.seagulls = []
+        self.engine.world.fish = []
+        self.engine.world.floe_fish = []
+        self.engine.spatial_grid.clear()
+        self.engine.spatial_grid.add(penguin)
+        self.engine.spatial_grid.add(seal)
+
+        # Teleport seal near penguin without updating spatial grid to emulate stale index.
+        seal.x = 206.0
+        seal.y = 204.0
+
+        self.engine._move_animal(penguin)
+
+        self.assertEqual(penguin.behavior_state, "fleeing")
+        self.assertGreater(penguin.flee_cooldown, 0)
+
+    def test_searching_penguin_moves_toward_feeding_seagull_on_land(self):
+        """Searching penguin should approach grounded seagull processing prey."""
+        self.engine.world.environment.ice_floes = [{
+            'x': 350.0, 'y': 300.0, 'radius': 180.0,
+            'shape': 'circle', 'radius_x': 180.0, 'radius_y': 180.0, 'rotation': 0
+        }]
+        penguin = Penguin(id="p_food", x=280.0, y=300.0, energy=20.0, state="land")
+        penguin.behavior_state = "searching"
+        penguin.hunting_cooldown = 0
+        seagull = Seagull(id="g_food", x=360.0, y=300.0, energy=70.0, state="grounded")
+        seagull.carrying_fish = True
+        seagull.behavior_state = "processing_prey"
+        seagull.prey_processing_ticks = 10
+
+        self.engine.world.penguins = [penguin]
+        self.engine.world.seals = []
+        self.engine.world.seagulls = [seagull]
+        self.engine.world.fish = []
+        self.engine.world.floe_fish = []
+
+        old_x = penguin.x
+        self.engine._move_animal(penguin)
+        self.assertGreater(penguin.x, old_x)
+
+    def test_searching_seal_prefers_nearest_land_food_source(self):
+        """Searching seal should use unified nearest target among floe fish and feeding seagull."""
+        self.engine.world.environment.ice_floes = [{
+            'x': 360.0, 'y': 280.0, 'radius': 220.0,
+            'shape': 'circle', 'radius_x': 220.0, 'radius_y': 220.0, 'rotation': 0
+        }]
+        seal = Seal(id="s_food", x=300.0, y=280.0, energy=30.0, state="land")
+        seal.behavior_state = "searching"
+        seal.hunting_cooldown = 0
+        # Dropped fish is closer than feeding seagull, seal should move right toward fish.
+        floe_fish = FloeFish(id="ff_near", x=320.0, y=280.0, ttl_ticks=100)
+        seagull = Seagull(id="g_far", x=390.0, y=280.0, energy=70.0, state="grounded")
+        seagull.carrying_fish = True
+        seagull.behavior_state = "processing_prey"
+        seagull.prey_processing_ticks = 10
+
+        self.engine.world.penguins = []
+        self.engine.world.seals = [seal]
+        self.engine.world.seagulls = [seagull]
+        self.engine.world.fish = []
+        self.engine.world.floe_fish = [floe_fish]
+
+        old_x = seal.x
+        self.engine._move_animal(seal)
+        self.assertGreater(seal.x, old_x)
+
+    def test_grounded_processing_seagull_stays_put_without_threat(self):
+        """Seagull processing prey should remain stationary unless threat appears."""
+        self.engine.world.environment.ice_floes = [{
+            'x': 240.0, 'y': 220.0, 'radius': 100.0,
+            'shape': 'circle', 'radius_x': 100.0, 'radius_y': 100.0, 'rotation': 0
+        }]
+        seagull = Seagull(id="g_static", x=240.0, y=220.0, energy=75.0, state="grounded")
+        seagull.carrying_fish = True
+        seagull.behavior_state = "processing_prey"
+        seagull.prey_processing_ticks = 8
+
+        self.engine.world.penguins = []
+        self.engine.world.seals = []
+        self.engine.world.seagulls = [seagull]
+        self.engine.world.fish = []
+        self.engine.world.floe_fish = []
+
+        old_x, old_y = seagull.x, seagull.y
+        self.engine._move_animal(seagull)
+
+        self.assertAlmostEqual(seagull.x, old_x)
+        self.assertAlmostEqual(seagull.y, old_y)
+        self.assertEqual(seagull.behavior_state, "processing_prey")
+        self.assertEqual(seagull.prey_processing_ticks, 7)
 
 
 if __name__ == '__main__':
