@@ -8,6 +8,22 @@ from .environment import Environment
 
 
 @dataclass
+class FloeFish:
+    """Fish dropped on an ice floe and available for scavenging."""
+    id: str
+    x: float
+    y: float
+    ttl_ticks: int
+    age: int = 0
+
+    def tick(self):
+        self.age += 1
+
+    def is_available(self) -> bool:
+        return self.age < self.ttl_ticks
+
+
+@dataclass
 class WorldState:
     """World state"""
     tick: int = 0
@@ -15,6 +31,7 @@ class WorldState:
     seals: List[Seal] = field(default_factory=list)
     fish: List[Fish] = field(default_factory=list)
     seagulls: List[Seagull] = field(default_factory=list)
+    floe_fish: List[FloeFish] = field(default_factory=list)
     environment: Environment = field(default_factory=Environment)
     
     def to_dict(self) -> Dict[str, Any]:
@@ -71,8 +88,20 @@ class WorldState:
                     "max_energy": g.max_energy,
                     "behavior_state": g.behavior_state,
                     "is_juvenile": g.is_juvenile(),
+                    "carrying_fish": g.carrying_fish,
+                    "prey_processing_ticks": g.prey_processing_ticks,
                 }
                 for g in self.seagulls
+            ],
+            "floe_fish": [
+                {
+                    "id": f.id,
+                    "x": f.x,
+                    "y": f.y,
+                    "ttl_ticks": f.ttl_ticks,
+                    "age": f.age,
+                }
+                for f in self.floe_fish
             ],
             "environment": {
                 "width": self.environment.width,

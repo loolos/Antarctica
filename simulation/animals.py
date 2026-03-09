@@ -207,6 +207,8 @@ class Seagull(Animal):
     state: Literal["flying", "grounded"] = "flying"
     breeding_cooldown: int = 0
     max_breeding_cooldown: int = 250
+    carrying_fish: bool = False
+    prey_processing_ticks: int = 0
 
     def __post_init__(self):
         self.max_energy = 120.0
@@ -244,23 +246,29 @@ class Seagull(Animal):
         )
 
     def move(self, dx: float, dy: float, world_width: int, world_height: int):
-        """Override: flying consumes 2x movement energy"""
+        """Override: flying consumes more energy, extra when carrying fish."""
         from .config import get_config
         config = get_config()
         base_consumption = config.ENERGY_CONSUMPTION_MOVE
         result = super().move(dx, dy, world_width, world_height)
-        # Flying: add extra consumption (total 2x)
+        # Base flying cost is 2x movement energy. Carrying fish costs 1.3x that.
         if self.state == "flying":
-            self.consume_energy(base_consumption)
+            flying_multiplier = 2.0
+            if self.carrying_fish:
+                flying_multiplier *= config.SEAGULL_CARRYING_ENERGY_MULTIPLIER
+            self.consume_energy(base_consumption * (flying_multiplier - 1.0))
         return result
 
     def tick(self):
         super().tick()
-        # Flying: add extra basal consumption (total 2x for tick)
+        # Base flying basal cost is 2x. Carrying fish costs 1.3x that.
         if self.state == "flying":
             from .config import get_config
             config = get_config()
-            self.consume_energy(config.ENERGY_CONSUMPTION_TICK)
+            flying_multiplier = 2.0
+            if self.carrying_fish:
+                flying_multiplier *= config.SEAGULL_CARRYING_ENERGY_MULTIPLIER
+            self.consume_energy(config.ENERGY_CONSUMPTION_TICK * (flying_multiplier - 1.0))
         if self.breeding_cooldown > 0:
             self.breeding_cooldown -= 1
         if self.hunting_cooldown > 0:

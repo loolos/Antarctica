@@ -7,7 +7,8 @@ import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from simulation.animals import Penguin, Seal, Fish
+from simulation.animals import Penguin, Seal, Fish, Seagull
+from simulation.config import get_config
 
 
 class TestAnimals(unittest.TestCase):
@@ -89,6 +90,22 @@ class TestAnimals(unittest.TestCase):
         p2 = Penguin(id="p2", x=3, y=4, energy=50)
         distance = p1.distance_to(p2)
         self.assertAlmostEqual(distance, 5.0, places=1)
+
+    def test_seagull_carrying_fish_costs_more_energy(self):
+        """Carrying fish should increase seagull flying energy drain to 1.3x."""
+        config = get_config()
+        normal = Seagull(id="g_normal", x=100, y=100, energy=100, state="flying")
+        carrying = Seagull(id="g_carry", x=100, y=100, energy=100, state="flying")
+        carrying.carrying_fish = True
+
+        normal.move(5, 0, 800, 600)
+        carrying.move(5, 0, 800, 600)
+
+        normal_loss = 100 - normal.energy
+        carrying_loss = 100 - carrying.energy
+        expected_ratio = config.SEAGULL_CARRYING_ENERGY_MULTIPLIER
+        self.assertGreater(carrying_loss, normal_loss)
+        self.assertAlmostEqual(carrying_loss / normal_loss, expected_ratio, places=2)
 
 
 if __name__ == '__main__':

@@ -8,7 +8,8 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from simulation.engine import SimulationEngine
-from simulation.animals import Penguin
+from simulation.animals import Penguin, Seagull, Fish
+from simulation.world import FloeFish
 
 
 class TestSimulationEngine(unittest.TestCase):
@@ -147,6 +148,70 @@ class TestSimulationEngine(unittest.TestCase):
         new_state = self.engine.get_state()
         dead_penguins = [p for p in new_state.penguins if p.energy <= 0]
         self.assertEqual(len(dead_penguins), 0)
+
+    def test_seagull_catches_fish_then_carries_to_floe(self):
+        """Seagull should carry fish after catch instead of instant energy gain."""
+        seagull = Seagull(id="g1", x=100.0, y=100.0, energy=70.0, state="flying")
+        seagull.behavior_state = "targeting"
+        fish = Fish(id="f1", x=103.0, y=103.0, energy=30.0)
+
+        self.engine.world.seagulls = [seagull]
+        self.engine.world.fish = [fish]
+        self.engine.world.penguins = []
+        self.engine.world.seals = []
+        self.engine.world.floe_fish = []
+        self.engine.spatial_grid.add(seagull)
+        self.engine.spatial_grid.add(fish)
+
+        self.engine._handle_predation()
+
+        self.assertEqual(len(self.engine.world.fish), 0)
+        self.assertTrue(seagull.carrying_fish)
+        self.assertEqual(seagull.behavior_state, "carrying_to_land")
+        self.assertEqual(seagull.target_id, "")
+
+    def test_seagull_processing_drops_fish_when_threat_near(self):
+        """Grounded seagull with fish should drop fish and flee if threatened."""
+        self.engine.world.environment.ice_floes = [{
+            'x': 200.0, 'y': 200.0, 'radius': 80.0,
+            'shape': 'circle', 'radius_x': 80.0, 'radius_y': 80.0, 'rotation': 0
+        }]
+        seagull = Seagull(id="g2", x=200.0, y=200.0, energy=80.0, state="grounded")
+        seagull.carrying_fish = True
+        seagull.behavior_state = "processing_prey"
+        seagull.prey_processing_ticks = 10
+        penguin = Penguin(id="p_threat", x=205.0, y=205.0, energy=80.0, state="land")
+
+        self.engine.world.seagulls = [seagull]
+        self.engine.world.penguins = [penguin]
+        self.engine.world.seals = []
+        self.engine.world.fish = []
+        self.engine.world.floe_fish = []
+
+        self.engine._move_animal(seagull)
+
+        self.assertFalse(seagull.carrying_fish)
+        self.assertEqual(seagull.state, "flying")
+        self.assertEqual(seagull.behavior_state, "fleeing")
+        self.assertEqual(len(self.engine.world.floe_fish), 1)
+
+    def test_searching_penguin_eats_dropped_floe_fish(self):
+        """Searching penguin on land should consume nearby dropped floe fish."""
+        penguin = Penguin(id="p_search", x=300.0, y=300.0, energy=20.0, state="land")
+        penguin.behavior_state = "searching"
+        floe_fish = FloeFish(id="ff1", x=302.0, y=302.0, ttl_ticks=100)
+
+        self.engine.world.penguins = [penguin]
+        self.engine.world.seals = []
+        self.engine.world.seagulls = []
+        self.engine.world.fish = []
+        self.engine.world.floe_fish = [floe_fish]
+
+        self.engine._handle_predation()
+
+        self.assertEqual(len(self.engine.world.floe_fish), 0)
+        self.assertGreater(penguin.energy, 20.0)
+        self.assertEqual(penguin.behavior_state, "idle")
 
 
 if __name__ == '__main__':
