@@ -104,7 +104,7 @@ class Penguin(Animal):
     
     def __post_init__(self):
         self.max_energy = 150.0
-        self.max_age = 800
+        self.max_age = 1600
         self.land_speed = 2.0  # Agile on land
         self.water_speed = 4.0  # Fast in water
         self.maturity_age = 100  # Age at which penguin becomes adult (100 ticks = 20 seconds)
@@ -159,7 +159,7 @@ class Seal(Animal):
     
     def __post_init__(self):
         self.max_energy = 200.0
-        self.max_age = 1200
+        self.max_age = 2400
         self.land_speed = 0.5   # Clumsy on land
         self.water_speed = 5.5  # Very fast in water
         self.maturity_age = 150  # Age at which seal becomes adult (150 ticks = 30 seconds)
