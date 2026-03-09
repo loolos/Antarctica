@@ -402,47 +402,49 @@ class SimulationEngine:
                     dx = nearest_floe['x'] - animal.x
                     dy = nearest_floe['y'] - animal.y
         
-        # 1a. Seagull flee - HIGHEST priority for grounded seagulls (before social, to avoid delay)
-        if isinstance(animal, Seagull) and animal.state == "grounded":
-            threats = [t for t in (list(self.world.seals) + list(self.world.penguins)) if t.is_alive()]
+        # 1a. Seagull flee - trigger on floe, continue countdown while flying.
+        if isinstance(animal, Seagull):
             config = get_config()
-            if animal.carrying_fish and animal.behavior_state != "processing_prey":
-                animal.behavior_state = "processing_prey"
-                if animal.prey_processing_ticks <= 0:
-                    animal.prey_processing_ticks = config.SEAGULL_PREY_PROCESSING_TICKS
-            # Use linear search for accurate distances (spatial grid may have stale positions)
-            nearest_threat = None
-            min_dist = config.SEAGULL_FLEE_RANGE_GROUNDED
-            for t in threats:
-                d = animal.distance_to(t)
-                if d < min_dist:
-                    min_dist = d
-                    nearest_threat = t
-            if nearest_threat and animal.behavior_state != "fleeing":
-                # While processing prey on floe, any close threat forces prey drop.
-                if animal.carrying_fish:
-                    self._drop_seagull_fish(animal)
-                animal.state = "flying"
-                animal.behavior_state = "fleeing"
-                animal.flee_cooldown = config.FLEE_COOLDOWN_TICKS
-                base_dx = animal.x - nearest_threat.x
-                base_dy = animal.y - nearest_threat.y
-                base_flee_angle = math.atan2(base_dy, base_dx) if (base_dx != 0 or base_dy != 0) else random.uniform(0, 2 * math.pi)
-                angle_variation = random.uniform(-config.FLEE_ANGLE_VARIATION, config.FLEE_ANGLE_VARIATION)
-                flee_angle = (base_flee_angle + angle_variation) % (2 * math.pi)
-                temp_dx = math.cos(flee_angle) * 100
-                temp_dy = math.sin(flee_angle) * 100
-                constrained_dx, constrained_dy = self._constrain_direction_near_edge(animal, temp_dx, temp_dy)
-                animal.flee_edge_direction = math.atan2(constrained_dy, constrained_dx)
-                target = nearest_threat
+            if animal.state == "grounded":
+                threats = [t for t in (list(self.world.seals) + list(self.world.penguins)) if t.is_alive()]
+                if animal.carrying_fish and animal.behavior_state != "processing_prey":
+                    animal.behavior_state = "processing_prey"
+                    if animal.prey_processing_ticks <= 0:
+                        animal.prey_processing_ticks = config.SEAGULL_PREY_PROCESSING_TICKS
+                # Use linear search for accurate distances (spatial grid may have stale positions)
+                nearest_threat = None
+                min_dist = config.SEAGULL_FLEE_RANGE_GROUNDED
+                for t in threats:
+                    d = animal.distance_to(t)
+                    if d < min_dist:
+                        min_dist = d
+                        nearest_threat = t
+                if nearest_threat and animal.behavior_state != "fleeing":
+                    # While processing prey on floe, any close threat forces prey drop.
+                    if animal.carrying_fish:
+                        self._drop_seagull_fish(animal)
+                    animal.state = "flying"
+                    animal.behavior_state = "fleeing"
+                    animal.flee_cooldown = config.FLEE_COOLDOWN_TICKS
+                    base_dx = animal.x - nearest_threat.x
+                    base_dy = animal.y - nearest_threat.y
+                    base_flee_angle = math.atan2(base_dy, base_dx) if (base_dx != 0 or base_dy != 0) else random.uniform(0, 2 * math.pi)
+                    angle_variation = random.uniform(-config.FLEE_ANGLE_VARIATION, config.FLEE_ANGLE_VARIATION)
+                    flee_angle = (base_flee_angle + angle_variation) % (2 * math.pi)
+                    temp_dx = math.cos(flee_angle) * 100
+                    temp_dy = math.sin(flee_angle) * 100
+                    constrained_dx, constrained_dy = self._constrain_direction_near_edge(animal, temp_dx, temp_dy)
+                    animal.flee_edge_direction = math.atan2(constrained_dy, constrained_dx)
+                    target = nearest_threat
+
             if animal.behavior_state == "fleeing" and animal.flee_cooldown > 0:
+                animal.state = "flying"
                 animal.flee_cooldown -= 1
                 flee_distance = config.FLEE_DISTANCE_MIN + random.uniform(0, config.FLEE_DISTANCE_MAX - config.FLEE_DISTANCE_MIN)
                 dx = math.cos(animal.flee_edge_direction) * flee_distance
                 dy = math.sin(animal.flee_edge_direction) * flee_distance
                 dx, dy = self._constrain_direction_near_edge(animal, dx, dy)
             elif animal.behavior_state == "fleeing" and animal.flee_cooldown == 0:
-                config = get_config()
                 energy_percent = animal.energy / animal.max_energy
                 if energy_percent < config.ENERGY_THRESHOLD_HUNTING:
                     animal.behavior_state = "searching"

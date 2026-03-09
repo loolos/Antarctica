@@ -195,6 +195,42 @@ class TestSimulationEngine(unittest.TestCase):
         self.assertEqual(seagull.behavior_state, "fleeing")
         self.assertEqual(len(self.engine.world.floe_fish), 1)
 
+    def test_seagull_exits_fleeing_after_cooldown_and_searches_when_hungry(self):
+        """Seagull should leave fleeing mode after countdown and resume hunting when hungry."""
+        seagull = Seagull(id="g_flee_hungry", x=250.0, y=250.0, energy=20.0, state="flying")
+        seagull.behavior_state = "fleeing"
+        seagull.flee_edge_direction = 0.0
+        seagull.flee_cooldown = 1
+
+        self.engine.world.seagulls = [seagull]
+        self.engine.world.penguins = []
+        self.engine.world.seals = []
+        self.engine.world.fish = []
+        self.engine.world.floe_fish = []
+
+        self.engine._move_animal(seagull)  # cooldown 1 -> 0, still fleeing this frame
+        self.assertEqual(seagull.behavior_state, "fleeing")
+        self.assertEqual(seagull.flee_cooldown, 0)
+
+        self.engine._move_animal(seagull)  # cooldown reached, should transition by hunger
+        self.assertEqual(seagull.behavior_state, "searching")
+
+    def test_seagull_exits_fleeing_after_cooldown_and_idles_when_not_hungry(self):
+        """Seagull should leave fleeing mode after countdown and idle when not hungry."""
+        seagull = Seagull(id="g_flee_full", x=250.0, y=250.0, energy=90.0, state="flying")
+        seagull.behavior_state = "fleeing"
+        seagull.flee_edge_direction = 0.0
+        seagull.flee_cooldown = 0
+
+        self.engine.world.seagulls = [seagull]
+        self.engine.world.penguins = []
+        self.engine.world.seals = []
+        self.engine.world.fish = []
+        self.engine.world.floe_fish = []
+
+        self.engine._move_animal(seagull)
+        self.assertEqual(seagull.behavior_state, "idle")
+
     def test_searching_penguin_eats_dropped_floe_fish(self):
         """Searching penguin on land should consume nearby dropped floe fish."""
         penguin = Penguin(id="p_search", x=300.0, y=300.0, energy=20.0, state="land")
