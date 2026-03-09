@@ -747,7 +747,10 @@ class SimulationEngine:
                 # - approach nearest dropped floe fish
                 # - or approach a grounded seagull currently processing prey
                 # (likely to trigger a flee+drop event nearby).
-                land_food_target = self._find_nearest_land_food_source(animal, max_distance=config.PREY_SEARCH_RANGE) if is_on_land else None
+                land_food_search_range = config.PREY_SEARCH_RANGE
+                if isinstance(animal, Seal):
+                    land_food_search_range *= config.SEAL_FLOE_PREY_SEARCH_MULTIPLIER
+                land_food_target = self._find_nearest_land_food_source(animal, max_distance=land_food_search_range) if is_on_land else None
                 if land_food_target is not None:
                     target = land_food_target
                     dx = land_food_target.x - animal.x
@@ -758,7 +761,8 @@ class SimulationEngine:
                     nearby_penguin = None
                     if isinstance(animal, Seal):
                         land_penguins = [p for p in self.world.penguins if p.is_alive() and p.id != animal.id and p.state == "land"]
-                        nearby_penguin = self._find_nearest(animal, land_penguins, max_distance=config.SEAL_LAND_PENGUIN_HUNT_RANGE)
+                        nearby_penguin_range = config.SEAL_LAND_PENGUIN_HUNT_RANGE * config.SEAL_FLOE_PREY_SEARCH_MULTIPLIER
+                        nearby_penguin = self._find_nearest(animal, land_penguins, max_distance=nearby_penguin_range)
                     
                     if nearby_penguin:
                         # Seal found close penguin - hunt it
@@ -860,8 +864,11 @@ class SimulationEngine:
                             
                             # Prioritize sea targets if both are available
                             config = get_config()
-                            sea_target = self._find_nearest(animal, sea_prey, max_distance=config.PREY_SEARCH_RANGE)
-                            land_target = self._find_nearest(animal, land_prey, max_distance=config.PREY_SEARCH_RANGE)
+                            seal_search_range = config.PREY_SEARCH_RANGE
+                            if animal.state == "land":
+                                seal_search_range *= config.SEAL_FLOE_PREY_SEARCH_MULTIPLIER
+                            sea_target = self._find_nearest(animal, sea_prey, max_distance=seal_search_range)
+                            land_target = self._find_nearest(animal, land_prey, max_distance=seal_search_range)
                             
                             # Prefer sea target if both are available
                             if sea_target and land_target:
@@ -937,6 +944,9 @@ class SimulationEngine:
                     
                     # Prioritize tracked sea target, then any sea target, then tracked land target, then any land target
                     config = get_config()
+                    land_tracking_distance = config.MAX_TRACKING_DISTANCE
+                    if animal.state == "land":
+                        land_tracking_distance *= config.SEAL_FLOE_PREY_SEARCH_MULTIPLIER
                     if tracked_sea and animal.distance_to(tracked_sea) <= config.MAX_TRACKING_DISTANCE:
                         target = tracked_sea
                         dx = tracked_sea.x - animal.x
@@ -949,13 +959,13 @@ class SimulationEngine:
                             animal.target_id = sea_target.id
                             dx = sea_target.x - animal.x
                             dy = sea_target.y - animal.y
-                        elif tracked_land and animal.distance_to(tracked_land) <= config.MAX_TRACKING_DISTANCE:
+                        elif tracked_land and animal.distance_to(tracked_land) <= land_tracking_distance:
                             target = tracked_land
                             dx = tracked_land.x - animal.x
                             dy = tracked_land.y - animal.y
                         else:
                             # Look for any land target
-                            land_target = self._find_nearest(animal, land_prey, max_distance=config.MAX_TRACKING_DISTANCE)
+                            land_target = self._find_nearest(animal, land_prey, max_distance=land_tracking_distance)
                             if land_target:
                                 target = land_target
                                 animal.target_id = land_target.id
@@ -1072,7 +1082,10 @@ class SimulationEngine:
                     
                     # Increased search range for better exploration
                     config = get_config()
-                    target = self._find_nearest(animal, valid_prey, max_distance=config.PREY_EXPLORATION_RANGE)
+                    exploration_range = config.PREY_EXPLORATION_RANGE
+                    if isinstance(animal, Seal) and animal.state == "land":
+                        exploration_range *= config.SEAL_FLOE_PREY_SEARCH_MULTIPLIER
+                    target = self._find_nearest(animal, valid_prey, max_distance=exploration_range)
                     if target:
                         dx = target.x - animal.x
                         dy = target.y - animal.y
