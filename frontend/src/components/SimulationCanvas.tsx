@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useCallback } from 'react';
 import { WorldState, AnimationState } from '../types';
-import { drawPenguin, drawSeal, drawFish, drawSeagull } from '../sprites';
+import { drawPenguin, drawSeal, drawFish, drawHalfEatenFish, drawSeagull } from '../sprites';
 
 interface SimulationCanvasProps {
   worldState: WorldState | null;
@@ -209,6 +209,18 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
       ctx.fillRect(0, 0, width, height);
     }
 
+    // Draw dropped prey on ice floes (half-eaten fish icon).
+    const floeFish = state.floe_fish || [];
+    const floeFishAnimationTime = ((performance.now() - animationStartTimeRef.current) * 0.001) % (Math.PI * 2);
+    floeFish.forEach((remains) => {
+      drawHalfEatenFish(ctx, {
+        x: remains.x,
+        y: remains.y,
+        age: remains.age,
+        animationTime: floeFishAnimationTime,
+      });
+    });
+
     // Draw fish with animated sprites
     state.fish.forEach((fish) => {
       const anim = anims.get(fish.id);
@@ -266,6 +278,7 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
         facing,
         animationTime,
         behaviorState: seagull.behavior_state || 'idle',
+        carryingFish: seagull.carrying_fish || false,
       });
     });
 
@@ -364,8 +377,9 @@ export const SimulationCanvas: React.FC<SimulationCanvasProps> = ({
     ctx.fillText(`Seals: ${state.seals.length}`, 10, 60);
     ctx.fillText(`Fish: ${state.fish.length}`, 10, 80);
     ctx.fillText(`Seagulls: ${(state.seagulls || []).length}`, 10, 100);
-    ctx.fillText(`Temperature: ${state.environment.temperature.toFixed(1)}°C`, 10, 120);
-    ctx.fillText(`Season: ${(state.environment.season / 1000).toFixed(1)}`, 10, 140);
+    ctx.fillText(`Floe Fish: ${(state.floe_fish || []).length}`, 10, 120);
+    ctx.fillText(`Temperature: ${state.environment.temperature.toFixed(1)}°C`, 10, 140);
+    ctx.fillText(`Season: ${(state.environment.season / 1000).toFixed(1)}`, 10, 160);
   }, [width, height]);
 
   // Animation loop (60fps interpolation)

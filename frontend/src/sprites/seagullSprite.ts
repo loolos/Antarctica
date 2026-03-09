@@ -11,10 +11,47 @@ export interface SeagullSpriteOptions {
   facing?: 'left' | 'right';
   animationTime?: number;
   behaviorState?: string; // idle, searching, targeting, fleeing
+  carryingFish?: boolean;
+}
+
+function drawCarriedFishIcon(ctx: CanvasRenderingContext2D, beakX: number, beakY: number): void {
+  ctx.save();
+  ctx.translate(beakX, beakY);
+  ctx.rotate(0.08);
+
+  ctx.fillStyle = '#4a9eff';
+  ctx.beginPath();
+  ctx.ellipse(0, 0, 3.2, 1.8, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.moveTo(3.2, 0);
+  ctx.lineTo(5.6, -1.5);
+  ctx.lineTo(5.6, 1.5);
+  ctx.closePath();
+  ctx.fill();
+
+  // Bite notch to differentiate from intact fish.
+  ctx.fillStyle = '#f5f7fa';
+  ctx.beginPath();
+  ctx.arc(-2.4, 0, 1.2, -Math.PI / 2, Math.PI / 2);
+  ctx.fill();
+
+  ctx.restore();
 }
 
 export function drawSeagull(ctx: CanvasRenderingContext2D, options: SeagullSpriteOptions): void {
-  const { x, y, state = 'flying', facing = 'right', animationTime = 0, energy, maxEnergy, behaviorState = 'idle' } = options;
+  const {
+    x,
+    y,
+    state = 'flying',
+    facing = 'right',
+    animationTime = 0,
+    energy,
+    maxEnergy,
+    behaviorState = 'idle',
+    carryingFish = false,
+  } = options;
   const isFlying = state === 'flying';
   const energyPercent = maxEnergy > 0 ? energy / maxEnergy : 1;
 
@@ -70,6 +107,10 @@ export function drawSeagull(ctx: CanvasRenderingContext2D, options: SeagullSprit
     ctx.closePath();
     ctx.fill();
 
+    if (carryingFish) {
+      drawCarriedFishIcon(ctx, -16.5, -1.6);
+    }
+
     // eye (color by behavior: pink=searching, reddish-brown=targeting, green=fleeing, dark=idle)
     const flyingEyeColor =
       behaviorState === 'searching' ? '#ff69b4' :
@@ -114,6 +155,10 @@ export function drawSeagull(ctx: CanvasRenderingContext2D, options: SeagullSprit
     ctx.lineTo(2, -5);
     ctx.closePath();
     ctx.fill();
+
+    if (carryingFish) {
+      drawCarriedFishIcon(ctx, 10.5, -5.5);
+    }
 
     // eye (color by behavior: pink=searching, reddish-brown=targeting, green=fleeing, dark=idle)
     const groundedEyeColor =
