@@ -12,6 +12,16 @@ export interface Animal {
   state?: 'land' | 'sea' | 'flying' | 'grounded';
   behavior_state?: string; // idle, searching, targeting, fleeing
   is_juvenile?: boolean; // true if animal is still a juvenile
+  carrying_fish?: boolean; // seagull-only: true when holding fish in beak
+  prey_processing_ticks?: number; // seagull-only: ticks spent processing prey on floe
+}
+
+export interface FloeFish {
+  id: string;
+  x: number;
+  y: number;
+  ttl_ticks: number;
+  age: number;
 }
 
 export interface IceFloe {
@@ -41,6 +51,7 @@ export interface WorldState {
   seals: Animal[];
   fish: Animal[];
   seagulls?: Animal[];
+  floe_fish?: FloeFish[];
   environment: Environment;
 }
 
