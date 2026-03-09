@@ -700,39 +700,38 @@ class SimulationEngine:
                         dy = nearby_penguin.y - animal.y
                         animal.hunt_direction_ticks = 0
                     else:
-                        # Penguin or Seal with no close penguin: walk straight toward sea (away from floe)
-                        # Fix direction once and keep it - never change until reaching sea (fleeing overrides elsewhere)
-                        nearest_floe = None
-                        min_dist = float('inf')
-                        for floe in self.world.environment.ice_floes:
-                            dist = math.sqrt((animal.x - floe['x'])**2 + (animal.y - floe['y'])**2)
-                            if dist < min_dist:
-                                min_dist = dist
-                                nearest_floe = floe
-                        
-                        if nearest_floe:
-                            # Set direction once when hunt_direction_ticks <= 0; never change while on land
-                            if animal.hunt_direction_ticks <= 0:
-                                away_dx = animal.x - nearest_floe['x']
-                                away_dy = animal.y - nearest_floe['y']
-                                dist = math.sqrt(away_dx*away_dx + away_dy*away_dy)
-                                if dist > 0:
-                                    animal.hunt_direction_angle = math.atan2(away_dy, away_dx)
+                        # Penguin or Seal with no close penguin: move toward nearest sea direction.
+                        # Re-evaluate regularly so animals can escape overlapping/irregular floes.
+                        if animal.hunt_direction_ticks <= 0:
+                            sea_direction = self._find_direction_to_nearest_sea(animal.x, animal.y)
+                            if sea_direction is not None:
+                                animal.hunt_direction_angle = sea_direction
+                            else:
+                                # Fallback to center-away direction if sea search fails.
+                                nearest_floe = None
+                                min_dist = float('inf')
+                                for floe in self.world.environment.ice_floes:
+                                    dist = math.sqrt((animal.x - floe['x'])**2 + (animal.y - floe['y'])**2)
+                                    if dist < min_dist:
+                                        min_dist = dist
+                                        nearest_floe = floe
+
+                                if nearest_floe:
+                                    away_dx = animal.x - nearest_floe['x']
+                                    away_dy = animal.y - nearest_floe['y']
+                                    dist = math.sqrt(away_dx * away_dx + away_dy * away_dy)
+                                    if dist > 0:
+                                        animal.hunt_direction_angle = math.atan2(away_dy, away_dx)
+                                    else:
+                                        animal.hunt_direction_angle = random.uniform(0, 2 * math.pi)
                                 else:
                                     animal.hunt_direction_angle = random.uniform(0, 2 * math.pi)
-                                animal.hunt_direction_ticks = 99999  # Never change direction while on land
-                            # Walk in fixed direction
-                            dx = math.cos(animal.hunt_direction_angle) * 50
-                            dy = math.sin(animal.hunt_direction_angle) * 50
-                        else:
-                            # No floe - random direction as fallback
-                            if animal.hunt_direction_ticks <= 0:
-                                animal.hunt_direction_ticks = random.randint(config.HUNTING_DIRECTION_TICKS_MIN, config.HUNTING_DIRECTION_TICKS_MAX)
-                                animal.hunt_direction_angle = random.uniform(0, 2 * math.pi)
-                            animal.hunt_direction_ticks -= 1
-                            search_distance = 30 + random.uniform(0, 20)
-                            dx = math.cos(animal.hunt_direction_angle) * search_distance
-                            dy = math.sin(animal.hunt_direction_angle) * search_distance
+
+                            animal.hunt_direction_ticks = 5
+
+                        animal.hunt_direction_ticks -= 1
+                        dx = math.cos(animal.hunt_direction_angle) * 50
+                        dy = math.sin(animal.hunt_direction_angle) * 50
                 else:
                     # In sea: normal searching (random direction, but prefer away from floe if too close)
                     if animal.hunt_direction_ticks <= 0:
@@ -1143,6 +1142,32 @@ class SimulationEngine:
                 else:
                     animal.hunt_direction_ticks = random.randint(config.HUNTING_DIRECTION_TICKS_MIN, config.HUNTING_DIRECTION_TICKS_MAX)
     
+    def _find_direction_to_nearest_sea(self, x: float, y: float) -> Optional[float]:
+        """Find a movement angle that reaches sea with the shortest sampled distance."""
+        if not self.world.environment.is_land(x, y):
+            return None
+
+        best_angle = None
+        best_distance = float('inf')
+        angle_samples = 24
+        step_distance = 8.0
+        max_distance = 240.0
+
+        for i in range(angle_samples):
+            angle = (2 * math.pi * i) / angle_samples
+            distance = step_distance
+            while distance <= max_distance:
+                test_x = x + math.cos(angle) * distance
+                test_y = y + math.sin(angle) * distance
+                if not self.world.environment.is_land(test_x, test_y):
+                    if distance < best_distance:
+                        best_distance = distance
+                        best_angle = angle
+                    break
+                distance += step_distance
+
+        return best_angle
+
     def _constrain_direction_near_edge(
         self, 
         animal: Animal, 
@@ -1586,4 +1611,3 @@ class SimulationEngine:
         """
         for _ in range(n):
             self.tick()
-

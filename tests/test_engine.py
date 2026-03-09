@@ -8,6 +8,7 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from simulation.engine import SimulationEngine
+from simulation.animals import Penguin
 
 
 class TestSimulationEngine(unittest.TestCase):
@@ -106,6 +107,33 @@ class TestSimulationEngine(unittest.TestCase):
         self.assertIsNotNone(final_temp)
         self.assertIsNotNone(final_ice)
     
+
+    def test_searching_penguin_on_land_moves_toward_sea(self):
+        """Low-energy penguin on land should leave floe instead of oscillating at center."""
+        # Keep world simple and deterministic: one circular floe in middle
+        self.engine.world.environment.ice_floes = [{
+            'x': 400.0, 'y': 300.0, 'radius': 120.0,
+            'shape': 'circle', 'radius_x': 120.0, 'radius_y': 120.0, 'rotation': 0
+        }]
+
+        penguin = Penguin(id='debug_penguin', x=400.0, y=300.0, energy=20.0, state='land')
+        penguin.age = 200
+        penguin.behavior_state = 'searching'
+        penguin.hunting_cooldown = 0
+        self.engine.world.penguins = [penguin]
+        self.engine.world.seals = []
+        self.engine.world.fish = []
+        self.engine.world.seagulls = []
+
+        left_land = False
+        for _ in range(80):
+            self.engine.tick()
+            if not self.engine.world.environment.is_land(penguin.x, penguin.y):
+                left_land = True
+                break
+
+        self.assertTrue(left_land, 'Searching penguin should be able to leave ice floe for sea')
+
     def test_animal_removal(self):
         """Test dead animal removal"""
         # Manually set some animal energy to 0
