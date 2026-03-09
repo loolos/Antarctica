@@ -14,10 +14,17 @@ export interface SeagullSpriteOptions {
   carryingFish?: boolean;
 }
 
-function drawCarriedFishIcon(ctx: CanvasRenderingContext2D, beakX: number, beakY: number): void {
+function drawCarriedFishIcon(
+  ctx: CanvasRenderingContext2D,
+  beakX: number,
+  beakY: number,
+  rotation = 0,
+  scale = 1
+): void {
   ctx.save();
   ctx.translate(beakX, beakY);
-  ctx.rotate(0.08);
+  ctx.rotate(0.08 + rotation);
+  ctx.scale(scale, scale);
 
   ctx.fillStyle = '#4a9eff';
   ctx.beginPath();
@@ -53,6 +60,7 @@ export function drawSeagull(ctx: CanvasRenderingContext2D, options: SeagullSprit
     carryingFish = false,
   } = options;
   const isFlying = state === 'flying';
+  const isProcessingPrey = !isFlying && behaviorState === 'processing_prey' && carryingFish;
   const energyPercent = maxEnergy > 0 ? energy / maxEnergy : 1;
 
   ctx.save();
@@ -123,8 +131,12 @@ export function drawSeagull(ctx: CanvasRenderingContext2D, options: SeagullSprit
     ctx.fill();
   } else {
     // ===== STANDING POSE (grounded on land) =====
-    const idleBob = Math.sin(animationTime * Math.PI * 2) * 0.8;
+    const idleBob = isProcessingPrey ? 0 : Math.sin(animationTime * Math.PI * 2) * 0.8;
+    const peckCycle = (Math.sin(animationTime * Math.PI * 8) + 1) * 0.5;
+    const peckDrop = isProcessingPrey ? peckCycle * 2.8 : 0;
+    const bodyLean = isProcessingPrey ? 0.16 : 0;
     ctx.translate(0, idleBob);
+    ctx.rotate(bodyLean);
 
     // body (more vertical/oval for standing bird)
     ctx.fillStyle = '#f5f7fa';
@@ -135,29 +147,47 @@ export function drawSeagull(ctx: CanvasRenderingContext2D, options: SeagullSprit
     // wings folded at sides (small tucked wings)
     ctx.fillStyle = '#e6ebf2';
     ctx.beginPath();
-    ctx.ellipse(-5, 0, 4, 6, 0.3, 0, Math.PI * 2);
+    ctx.ellipse(-5, isProcessingPrey ? 0.6 : 0, 4, 6, 0.3, 0, Math.PI * 2);
     ctx.fill();
     ctx.beginPath();
-    ctx.ellipse(5, 0, 4, 6, -0.3, 0, Math.PI * 2);
+    ctx.ellipse(5, isProcessingPrey ? 0.6 : 0, 4, 6, -0.3, 0, Math.PI * 2);
     ctx.fill();
 
     // head (above body, more upright)
     ctx.fillStyle = '#ffffff';
     ctx.beginPath();
-    ctx.arc(0, -6, 3.5, 0, Math.PI * 2);
+    ctx.arc(isProcessingPrey ? 1.2 : 0, -6 + peckDrop, 3.5, 0, Math.PI * 2);
     ctx.fill();
 
-    // beak (pointing forward)
+    // beak (pecking downward while processing prey)
     ctx.fillStyle = '#ffcc66';
     ctx.beginPath();
-    ctx.moveTo(2, -6);
-    ctx.lineTo(8, -5.5);
-    ctx.lineTo(2, -5);
+    if (isProcessingPrey) {
+      ctx.moveTo(3.4, -5.5 + peckDrop);
+      ctx.lineTo(8.8, -2.8 + peckDrop);
+      ctx.lineTo(4.1, -3.8 + peckDrop);
+    } else {
+      ctx.moveTo(2, -6);
+      ctx.lineTo(8, -5.5);
+      ctx.lineTo(2, -5);
+    }
     ctx.closePath();
     ctx.fill();
 
     if (carryingFish) {
-      drawCarriedFishIcon(ctx, 10.5, -5.5);
+      if (isProcessingPrey) {
+        const fishWiggle = Math.sin(animationTime * Math.PI * 12) * 0.16;
+        drawCarriedFishIcon(ctx, 9.2, -2.4 + peckDrop, 0.45 + fishWiggle, 0.95);
+
+        // Tiny "crumb/bone" specks to make pecking more expressive.
+        ctx.fillStyle = 'rgba(244, 247, 251, 0.7)';
+        ctx.beginPath();
+        ctx.arc(7.4, -0.4 + peckDrop, 0.55, 0, Math.PI * 2);
+        ctx.arc(8.7, 0.4 + peckDrop, 0.45, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        drawCarriedFishIcon(ctx, 10.5, -5.5);
+      }
     }
 
     // eye (color by behavior: pink=searching, reddish-brown=targeting, green=fleeing, dark=idle)
@@ -168,17 +198,17 @@ export function drawSeagull(ctx: CanvasRenderingContext2D, options: SeagullSprit
       '#1b1b1b';
     ctx.fillStyle = groundedEyeColor;
     ctx.beginPath();
-    ctx.arc(1.2, -6.8, 1.1, 0, Math.PI * 2);
+    ctx.arc(isProcessingPrey ? 2.2 : 1.2, -6.8 + peckDrop, 1.1, 0, Math.PI * 2);
     ctx.fill();
 
     // legs (standing)
     ctx.strokeStyle = '#d4a84b';
     ctx.lineWidth = 1.2;
     ctx.beginPath();
-    ctx.moveTo(-2, 9);
-    ctx.lineTo(-2, 14);
-    ctx.moveTo(2, 9);
-    ctx.lineTo(2, 14);
+    ctx.moveTo(-2.4, 9);
+    ctx.lineTo(-2.8, isProcessingPrey ? 14.8 : 14);
+    ctx.moveTo(2.2, 9);
+    ctx.lineTo(2.8, isProcessingPrey ? 14.8 : 14);
     ctx.stroke();
   }
 
