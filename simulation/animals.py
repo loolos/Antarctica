@@ -29,6 +29,7 @@ class Animal:
     target_id: str = ""  # ID of the target being tracked (for distance tracking)
     hunting_cooldown: int = 0  # Cooldown after successful predation (prevents immediate re-hunting)
     flee_cooldown: int = 0  # Cooldown for fleeing state (continues fleeing for 3 seconds after predator is out of sight)
+    sea_exit_direction_locked: bool = False  # Keep a fixed heading while leaving floes for sea
     
     def move(self, dx: float, dy: float, world_width: int, world_height: int):
         """Move the animal"""

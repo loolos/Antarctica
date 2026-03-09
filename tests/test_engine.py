@@ -4,6 +4,7 @@ Test simulation engine
 import unittest
 import sys
 import os
+import math
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
@@ -134,6 +135,67 @@ class TestSimulationEngine(unittest.TestCase):
                 break
 
         self.assertTrue(left_land, 'Searching penguin should be able to leave ice floe for sea')
+
+    def test_searching_penguin_keeps_sea_exit_heading_across_floes_until_sea_or_flee(self):
+        """Sea-exit heading should stay fixed on floes and unlock only in sea/flee."""
+        self.engine.world.environment.ice_floes = [
+            {
+                'x': 220.0, 'y': 300.0, 'radius': 130.0,
+                'shape': 'circle', 'radius_x': 130.0, 'radius_y': 130.0, 'rotation': 0
+            },
+            {
+                'x': 420.0, 'y': 420.0, 'radius': 140.0,
+                'shape': 'circle', 'radius_x': 140.0, 'radius_y': 140.0, 'rotation': 0
+            },
+        ]
+
+        penguin = Penguin(id='p_lock', x=220.0, y=300.0, energy=20.0, state='land')
+        penguin.age = 200
+        penguin.behavior_state = 'searching'
+        penguin.hunting_cooldown = 0
+        self.engine.world.penguins = [penguin]
+        self.engine.world.seals = []
+        self.engine.world.fish = []
+        self.engine.world.seagulls = []
+        self.engine.world.floe_fish = []
+
+        # First move on floe establishes locked heading toward sea.
+        self.engine._move_animal(penguin)
+        initial_angle = penguin.hunt_direction_angle
+        self.assertTrue(penguin.sea_exit_direction_locked)
+
+        # Simulate stepping onto another floe before reaching sea.
+        penguin.x = 320.0
+        penguin.y = 420.0
+        penguin.hunt_direction_ticks = 0
+        self.assertTrue(self.engine.world.environment.is_land(penguin.x, penguin.y))
+        self.engine._move_animal(penguin)
+
+        angle_delta = abs(((penguin.hunt_direction_angle - initial_angle + math.pi) % (2 * math.pi)) - math.pi)
+        self.assertLess(angle_delta, 1e-6)
+        self.assertTrue(penguin.sea_exit_direction_locked)
+
+        # Once in sea, lock should clear.
+        penguin.x = 760.0
+        penguin.y = 40.0
+        penguin.behavior_state = "searching"
+        penguin.sea_exit_direction_locked = True
+        self.assertFalse(self.engine.world.environment.is_land(penguin.x, penguin.y))
+        self.engine._move_animal(penguin)
+        self.assertFalse(penguin.sea_exit_direction_locked)
+
+        # Entering flee state should also clear lock.
+        penguin.x = 220.0
+        penguin.y = 300.0
+        penguin.state = "land"
+        penguin.behavior_state = "searching"
+        penguin.sea_exit_direction_locked = True
+        penguin.energy = 80.0
+        seal = Seal(id="s_near_lock", x=224.0, y=302.0, energy=120.0, state="land")
+        self.engine.world.seals = [seal]
+        self.engine._move_animal(penguin)
+        self.assertEqual(penguin.behavior_state, "fleeing")
+        self.assertFalse(penguin.sea_exit_direction_locked)
 
     def test_animal_removal(self):
         """Test dead animal removal"""

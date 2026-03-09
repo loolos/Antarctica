@@ -329,6 +329,10 @@ class SimulationEngine:
             else:
                 animal.state = "sea"
         
+        # Leaving floes lock only applies while searching on land.
+        if isinstance(animal, (Penguin, Seal)) and not is_on_land:
+            animal.sea_exit_direction_locked = False
+        
         # Determine speed based on location and age
         if isinstance(animal, (Penguin, Seal, Seagull)):
             # Seagull.get_speed uses its state (flying/grounded), not terrain
@@ -480,14 +484,20 @@ class SimulationEngine:
             elif energy_percent < config.ENERGY_THRESHOLD_HUNTING and energy_percent <= config.ENERGY_THRESHOLD_HIGH and animal.behavior_state not in ["fleeing", "targeting"] and animal.hunting_cooldown == 0:
                 if animal.behavior_state != "searching":
                     animal.behavior_state = "searching"
+                    if isinstance(animal, (Penguin, Seal)):
+                        animal.sea_exit_direction_locked = False
                     animal.hunt_direction_angle = random.uniform(0, 2 * math.pi)
                     animal.hunt_direction_ticks = random.randint(15, 40)
             elif energy_percent >= config.ENERGY_THRESHOLD_HUNTING and animal.behavior_state == "searching":
                 animal.behavior_state = "idle"
+                if isinstance(animal, (Penguin, Seal)):
+                    animal.sea_exit_direction_locked = False
                 animal.hunt_direction_ticks = 0
             elif energy_percent > config.ENERGY_THRESHOLD_HIGH and animal.behavior_state in ["searching", "targeting"]:
                 animal.behavior_state = "idle"
                 animal.target_id = ""
+                if isinstance(animal, (Penguin, Seal)):
+                    animal.sea_exit_direction_locked = False
                 animal.hunt_direction_ticks = 0
 
         # 1b. Social behavior - skip when searching (searching has higher priority)
@@ -634,6 +644,7 @@ class SimulationEngine:
             if nearest_predator and animal.behavior_state != "fleeing":
                 # Flee! Change to fleeing state (highest priority: flee > target > disperse > hunt)
                 animal.behavior_state = "fleeing"
+                animal.sea_exit_direction_locked = False
                 # Set flee cooldown (3 seconds at 5 ticks/sec)
                 config = get_config()
                 animal.flee_cooldown = config.FLEE_COOLDOWN_TICKS
@@ -774,15 +785,15 @@ class SimulationEngine:
                     if nearby_penguin:
                         # Seal found close penguin - hunt it
                         animal.behavior_state = "targeting"
+                        animal.sea_exit_direction_locked = False
                         animal.target_id = nearby_penguin.id
                         target = nearby_penguin
                         dx = nearby_penguin.x - animal.x
                         dy = nearby_penguin.y - animal.y
                         animal.hunt_direction_ticks = 0
                     else:
-                        # Penguin or Seal with no close penguin: move toward nearest sea direction.
-                        # Re-evaluate regularly so animals can escape overlapping/irregular floes.
-                        if animal.hunt_direction_ticks <= 0:
+                        # Penguin/Seal leaving floes for sea: lock heading until reaching water.
+                        if not animal.sea_exit_direction_locked:
                             sea_direction = self._find_direction_to_nearest_sea(animal.x, animal.y)
                             if sea_direction is not None:
                                 animal.hunt_direction_angle = sea_direction
@@ -806,13 +817,12 @@ class SimulationEngine:
                                         animal.hunt_direction_angle = random.uniform(0, 2 * math.pi)
                                 else:
                                     animal.hunt_direction_angle = random.uniform(0, 2 * math.pi)
+                            animal.sea_exit_direction_locked = True
 
-                            animal.hunt_direction_ticks = 5
-
-                        animal.hunt_direction_ticks -= 1
                         dx = math.cos(animal.hunt_direction_angle) * 50
                         dy = math.sin(animal.hunt_direction_angle) * 50
                 else:
+                    animal.sea_exit_direction_locked = False
                     # In sea: normal searching (random direction, but prefer away from floe if too close)
                     if animal.hunt_direction_ticks <= 0:
                         config = get_config()
@@ -906,6 +916,7 @@ class SimulationEngine:
                         if nearby_prey:
                             # Found prey! Switch from searching to targeting
                             animal.behavior_state = "targeting"
+                            animal.sea_exit_direction_locked = False
                             animal.target_id = nearby_prey.id  # Store target ID for tracking
                             target = nearby_prey
                             dx = nearby_prey.x - animal.x
